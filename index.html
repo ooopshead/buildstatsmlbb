@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MLBB Pro Stats</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <!-- Header -->
+  <div class="header">
+    <h1 @click="goHome">MLBB Pro Stats</h1>
+    <input class="search" type="text" placeholder="Search hero..." v-model="search" v-show="view==='list'">
+    <div class="header-btn" :class="{active: view==='admin'}" @click="toggleAdmin">
+      &#9881; Data
+    </div>
+  </div>
+
+  <div class="container">
+    <!-- HERO LIST VIEW -->
+    <template v-if="view==='list'">
+      <div class="filters">
+        <label>Sort:</label>
+        <select v-model="sortBy">
+          <option value="games">Games ↓</option>
+          <option value="wr">Winrate ↓</option>
+          <option value="name">Name A-Z</option>
+        </select>
+        <label>Min games:</label>
+        <input type="number" v-model.number="minGames" min="0" max="999" style="width:70px">
+      </div>
+
+      <div class="hero-grid">
+        <div class="hero-tile" v-for="h in filteredHeroes" :key="h.slug"
+             @click="openHero(h)" :class="{'no-data': h.games===0}">
+          <img :src="h.portrait" :alt="h.name" loading="lazy"
+               @error="$event.target.src='img/heroes/unknown.png'">
+          <div class="name">{{ h.name }}</div>
+          <div class="stats" v-if="h.games > 0">
+            {{ h.games }}g &bull;
+            <span :class="wrClass(h.wr)">{{ (h.wr*100).toFixed(1) }}%</span>
+          </div>
+          <div class="stats" v-else>No data</div>
+        </div>
+      </div>
+    </template>
+
+    <!-- HERO DETAIL VIEW -->
+    <template v-if="view==='hero' && hero">
+      <div class="back-btn" @click="goHome">← Back to heroes</div>
+
+      <div class="hero-header">
+        <img :src="hero.portrait" :alt="hero.name"
+             @error="$event.target.src='img/heroes/unknown.png'">
+        <div class="info">
+          <h2>{{ hero.name }}</h2>
+          <div class="baseline">
+            {{ hero.total_games }}g &bull;
+            {{ hero.wins }}W/{{ hero.total_games - hero.wins }}L &bull;
+            <span class="wr" :class="wrClass(hero.wr)">{{ (hero.wr*100).toFixed(1) }}%</span> WR
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="tabs">
+        <div class="tab" :class="{active: tab==='items'}" @click="tab='items'">Items</div>
+        <div class="tab" :class="{active: tab==='combos'}" @click="tab='combos'">Builds</div>
+        <div class="tab" :class="{active: tab==='emblems'}" @click="tab='emblems'">Emblems</div>
+        <div class="tab" :class="{active: tab==='talents'}" @click="tab='talents'">Talents</div>
+        <div class="tab" :class="{active: tab==='emb_tal'}" @click="tab='emb_tal'">Emblem+Talents</div>
+        <div class="tab" :class="{active: tab==='players'}" @click="tab='players'">Players</div>
+      </div>
+
+      <!-- ITEMS TAB -->
+      <div v-if="tab==='items'" class="section">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th></th>
+              <th @click="sortItems('name')">Item</th>
+              <th @click="sortItems('wr')">WR</th>
+              <th @click="sortItems('games')">Games</th>
+              <th>vs base</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="it in sortedItems" :key="it.id||it.name">
+              <td><img class="icon" :src="itemIcon(it.id)" v-if="it.id"></td>
+              <td>{{ it.name }}</td>
+              <td class="wr" :class="wrClass(it.wr)">{{ (it.wr*100).toFixed(1) }}%</td>
+              <td>{{ it.games }}</td>
+              <td :class="deltaClass(it.wr - hero.wr)">{{ deltaFmt(it.wr - hero.wr) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- BUILDS (COMBOS) TAB -->
+      <div v-if="tab==='combos'" class="section">
+        <div class="filters" style="margin-bottom:12px">
+          <label>Combo size:</label>
+          <select v-model="comboSize">
+            <option value="6">Full build (6)</option>
+            <option value="5">5 items</option>
+            <option value="4">4 items</option>
+            <option value="3">3 items</option>
+          </select>
+        </div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Build</th>
+              <th @click="sortCombos('wr')">WR</th>
+              <th @click="sortCombos('games')">Games</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(c, i) in sortedCombos" :key="i">
+              <td>
+                <div class="combo-items">
+                  <template v-for="name in c.items">
+                    <img :src="itemIconByName(name)" :title="name"
+                         @error="$event.target.style.display='none'">
+                  </template>
+                  <span class="item-name" v-if="c.items.length<=3">{{ c.items.join(' + ') }}</span>
+                </div>
+              </td>
+              <td class="wr" :class="wrClass(c.wr)">{{ (c.wr*100).toFixed(1) }}%</td>
+              <td>{{ c.games }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <div v-if="sortedCombos.length===0" style="color:var(--text2);padding:20px">
+          No combos with enough games. Try a smaller combo size.
+        </div>
+      </div>
+
+      <!-- EMBLEMS TAB -->
+      <div v-if="tab==='emblems'" class="section">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th></th>
+              <th>Emblem</th>
+              <th @click="sortEmblems('wr')">WR</th>
+              <th @click="sortEmblems('games')">Games</th>
+              <th>Pick%</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="e in sortedEmblems" :key="e.id||e.name">
+              <td><img class="icon" :src="emblemIcon(e.id)" v-if="e.id"></td>
+              <td>{{ e.name }}</td>
+              <td class="wr" :class="wrClass(e.wr)">{{ (e.wr*100).toFixed(1) }}%</td>
+              <td>{{ e.games }}</td>
+              <td>{{ (e.games/hero.total_games*100).toFixed(0) }}%</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- TALENTS TAB -->
+      <div v-if="tab==='talents'" class="section">
+        <div class="filters" style="margin-bottom:12px">
+          <label>Filter class:</label>
+          <select v-model="talentClassFilter">
+            <option value="">All</option>
+            <option v-for="c in talentClasses" :value="c">{{ c }}</option>
+          </select>
+          <label>Type:</label>
+          <select v-model="talentTypeFilter">
+            <option value="">All</option>
+            <option value="core">Core</option>
+            <option value="standard">Standard</option>
+          </select>
+        </div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th></th>
+              <th>Talent</th>
+              <th>Class</th>
+              <th>Type</th>
+              <th @click="sortTalents('wr')">WR</th>
+              <th @click="sortTalents('games')">Games</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="t in sortedTalents" :key="t.id">
+              <td><img class="icon" :src="runeIcon(t.id)" v-if="t.id"></td>
+              <td>{{ t.name }}</td>
+              <td>{{ t.class }}</td>
+              <td>{{ t.type }}</td>
+              <td class="wr" :class="wrClass(t.wr)">{{ (t.wr*100).toFixed(1) }}%</td>
+              <td>{{ t.games }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- EMBLEM+TALENTS TAB -->
+      <div v-if="tab==='emb_tal'" class="section">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Emblem</th>
+              <th>Talents</th>
+              <th @click="sortEmbTal('wr')">WR</th>
+              <th @click="sortEmbTal('games')">Games</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(et, i) in sortedEmbTal" :key="i">
+              <td>
+                <img class="icon-sm" :src="emblemIcon(et.emblem_id)" v-if="et.emblem_id">
+                {{ et.emblem }}
+              </td>
+              <td>
+                <div class="talent-combo">
+                  <template v-for="t in et.talents" :key="t.id">
+                    <img :src="runeIcon(t.id)" :title="t.name" class="icon-sm">
+                  </template>
+                  <span style="font-size:12px;color:var(--text2);margin-left:4px">
+                    {{ et.talents.map(t=>t.name).join(' + ') }}
+                  </span>
+                </div>
+              </td>
+              <td class="wr" :class="wrClass(et.wr)">{{ (et.wr*100).toFixed(1) }}%</td>
+              <td>{{ et.games }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <div v-if="sortedEmbTal.length===0" style="color:var(--text2);padding:20px">
+          No emblem+talent combos with enough games.
+        </div>
+      </div>
+
+      <!-- PLAYERS TAB -->
+      <div v-if="tab==='players'" class="section">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th @click="sortPlayers('name')">Player</th>
+              <th @click="sortPlayers('wr')">WR</th>
+              <th @click="sortPlayers('games')">Games</th>
+              <th>Emblem</th>
+              <th>Talents</th>
+              <th>Most used build</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="p in sortedPlayers" :key="p.name" class="player-row">
+              <td><strong>{{ p.name }}</strong></td>
+              <td class="wr" :class="wrClass(p.wr)">{{ (p.wr*100).toFixed(1) }}%</td>
+              <td>{{ p.games }}</td>
+              <td>{{ p.top_emblem }}</td>
+              <td>
+                <div class="talent-combo" v-if="p.top_talents.length">
+                  <template v-for="t in p.top_talents" :key="t.id">
+                    <img :src="runeIcon(t.id)" :title="t.name" class="icon-sm">
+                  </template>
+                </div>
+              </td>
+              <td>
+                <div class="build-icons">
+                  <template v-for="name in p.top_build">
+                    <img :src="itemIconByName(name)" :title="name"
+                         @error="$event.target.style.display='none'">
+                  </template>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </template>
+
+    <!-- ADMIN VIEW -->
+    <template v-if="view==='admin'">
+      <div class="back-btn" @click="goHome">← Back to heroes</div>
+      <h2 style="color:var(--accent);margin-bottom:16px">Data Management</h2>
+
+      <!-- Scoregg API Config -->
+      <div class="admin-section">
+        <div class="section-title">Scoregg API Token</div>
+        <p style="color:var(--text2);font-size:13px;margin-bottom:10px">
+          Token and UID from DevTools (Network → Headers). Stored locally in config.json.
+          <span v-if="configStatus.token_set" style="color:var(--green)">
+            ✓ Set ({{ configStatus.token_preview }})
+          </span>
+          <span v-else style="color:var(--red)">✗ Not set</span>
+        </p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">
+          <div>
+            <label style="font-size:12px;color:var(--text2)">Token</label>
+            <input type="text" v-model="cfgToken" placeholder="16f6983cac..." class="admin-input" style="width:320px">
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--text2)">UID</label>
+            <input type="text" v-model="cfgUid" placeholder="299" class="admin-input" style="width:80px">
+          </div>
+          <button class="btn-rebuild" style="padding:8px 16px;font-size:13px" @click="saveConfig">Save</button>
+        </div>
+        <div v-if="configMsg" class="admin-msg" style="margin-top:8px">{{ configMsg }}</div>
+      </div>
+
+      <!-- Fetch from Scoregg -->
+      <div class="admin-section">
+        <div class="section-title">Fetch from Scoregg API</div>
+        <p style="color:var(--text2);font-size:13px;margin-bottom:10px">
+          Enter tournament ID to download all match records directly from scoregg.
+          Full talent/emblem/item data with icons — no xls limitations.
+        </p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">
+          <div>
+            <label style="font-size:12px;color:var(--text2)">Tournament ID</label>
+            <input type="text" v-model="fetchTournamentId" placeholder="176" class="admin-input" style="width:100px">
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--text2)">Start date (optional)</label>
+            <input type="date" v-model="fetchStartDate" class="admin-input">
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--text2)">End date (optional)</label>
+            <input type="date" v-model="fetchEndDate" class="admin-input">
+          </div>
+          <button class="btn-rebuild" style="padding:8px 16px;font-size:13px"
+                  @click="fetchFromScoregg" :disabled="fetching || !fetchTournamentId">
+            {{ fetching ? 'Fetching...' : 'Fetch' }}
+          </button>
+        </div>
+        <div v-if="fetchMsg" class="admin-msg" :class="{error: fetchError}">{{ fetchMsg }}</div>
+      </div>
+
+      <!-- Upload -->
+      <div class="admin-section">
+        <div class="section-title">Upload Tournament Data (manual)</div>
+        <p style="color:var(--text2);font-size:13px;margin-bottom:10px">
+          Accepts <code>.json</code> (player_record API dump) or <code>.xls</code> (scoregg export).
+        </p>
+        <div class="upload-zone" @dragover.prevent="dragOver=true" @dragleave="dragOver=false"
+             @drop.prevent="handleDrop" :class="{hover: dragOver}"
+             @click="$refs.fileInput.click()">
+          <input type="file" ref="fileInput" accept=".json,.xls" @change="handleFileSelect" style="display:none" multiple>
+          <div v-if="!uploading">Drop files here or click to browse</div>
+          <div v-else>Uploading...</div>
+        </div>
+        <div v-if="uploadMsg" class="admin-msg" :class="{error: uploadError}">{{ uploadMsg }}</div>
+      </div>
+
+      <!-- Loaded tournaments -->
+      <div class="admin-section">
+        <div class="section-title">
+          Loaded Tournaments
+          <span style="font-size:13px;color:var(--text2);font-weight:normal;margin-left:8px">
+            ({{ tournaments.length }} files)
+          </span>
+        </div>
+        <table class="data-table" v-if="tournaments.length">
+          <thead>
+            <tr>
+              <th>Tournament</th>
+              <th>Records</th>
+              <th>Date range</th>
+              <th>File</th>
+              <th>Size</th>
+              <th>Uploaded</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="t in tournaments" :key="t.filename">
+              <td><strong>{{ t.tournament }}</strong></td>
+              <td>{{ t.records }}</td>
+              <td>{{ t.date_range || '—' }}</td>
+              <td style="font-size:12px;color:var(--text2)">{{ t.filename }}</td>
+              <td>{{ t.size_mb }} MB</td>
+              <td style="font-size:12px">{{ t.uploaded }}</td>
+              <td>
+                <button class="btn-delete" @click="deleteTournament(t)"
+                        :disabled="deleting===t.filename">
+                  {{ deleting===t.filename ? '...' : 'Delete' }}
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <div v-else style="color:var(--text2);padding:16px">No tournament files loaded.</div>
+      </div>
+
+      <!-- Rebuild -->
+      <div class="admin-section">
+        <div class="section-title">Rebuild Statistics</div>
+        <p style="color:var(--text2);font-size:13px;margin-bottom:10px">
+          Re-processes all tournament data and regenerates hero statistics.
+        </p>
+        <button class="btn-rebuild" @click="rebuild" :disabled="rebuilding">
+          {{ rebuilding ? 'Rebuilding...' : 'Rebuild All Stats' }}
+        </button>
+        <pre v-if="rebuildOutput" class="rebuild-output">{{ rebuildOutput }}</pre>
+      </div>
+    </template>
+
+    <!-- Loading -->
+    <div v-if="loading" style="text-align:center;padding:40px;color:var(--text2)">Loading...</div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
