@@ -133,6 +133,48 @@ a:hover { text-decoration: underline; }
 }
 .back-btn:hover { background: var(--card-hover); color: var(--text); }
 
+/* Date filter */
+.date-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  background: var(--card);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+.date-filter label {
+  font-size: 13px; font-weight: 600; color: var(--text2);
+}
+.date-filter input[type="date"] {
+  padding: 5px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+  color-scheme: dark;
+}
+.date-filter .dash { color: var(--text2); }
+.date-presets { display: flex; gap: 4px; margin-left: 4px; }
+.date-preset {
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text2);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.date-preset:hover { color: var(--text); border-color: var(--accent); }
+.date-preset.active { background: var(--accent2); color: var(--text); border-color: var(--accent); }
+.date-range-hint {
+  font-size: 11px; color: var(--text2); margin-left: auto;
+}
+
 /* Tabs */
 .tabs {
   display: flex;

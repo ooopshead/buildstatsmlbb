@@ -56,11 +56,36 @@
         <div class="info">
           <h2>{{ hero.name }}</h2>
           <div class="baseline">
-            {{ hero.total_games }}g &bull;
-            {{ hero.wins }}W/{{ hero.total_games - hero.wins }}L &bull;
-            <span class="wr" :class="wrClass(hero.wr)">{{ (hero.wr*100).toFixed(1) }}%</span> WR
+            {{ aggregated.total_games }}g &bull;
+            {{ aggregated.wins }}W/{{ aggregated.total_games - aggregated.wins }}L &bull;
+            <span class="wr" :class="wrClass(aggregated.wr)">{{ (aggregated.wr*100).toFixed(1) }}%</span> WR
+            <span v-if="dateFrom || dateTo" style="color:var(--text2);font-size:12px;margin-left:6px">
+              (filtered from {{ hero.total_games }}g)
+            </span>
           </div>
         </div>
+      </div>
+
+      <!-- Date filter -->
+      <div class="date-filter">
+        <label>Date:</label>
+        <input type="date" v-model="dateFrom" :min="dateMin" :max="dateMax">
+        <span class="dash">—</span>
+        <input type="date" v-model="dateTo" :min="dateMin" :max="dateMax">
+        <div class="date-presets">
+          <button class="date-preset" @click="setDatePreset('all')"
+                  :class="{active: !dateFrom && !dateTo}">All</button>
+          <button class="date-preset" @click="setDatePreset('7d')">Last 7d</button>
+          <button class="date-preset" @click="setDatePreset('14d')">Last 14d</button>
+          <button class="date-preset" @click="setDatePreset('30d')">Last 30d</button>
+        </div>
+        <span class="date-range-hint" v-if="dateMin">
+          available: {{ dateMin }} → {{ dateMax }}
+        </span>
+      </div>
+
+      <div v-if="aggregated.total_games===0" style="background:var(--card);padding:20px;border-radius:var(--radius);text-align:center;color:var(--text2);margin-bottom:16px">
+        No matches in selected date range.
       </div>
 
       <!-- Tabs -->
@@ -86,12 +111,13 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="it in sortedItems" :key="it.id||it.name">
-              <td><img class="icon" :src="itemIcon(it.id)" v-if="it.id"></td>
+            <tr v-for="it in sortedItems" :key="it.name">
+              <td><img class="icon" :src="itemIconByName(it.name)"
+                       @error="$event.target.style.display='none'"></td>
               <td>{{ it.name }}</td>
               <td class="wr" :class="wrClass(it.wr)">{{ (it.wr*100).toFixed(1) }}%</td>
               <td>{{ it.games }}</td>
-              <td :class="deltaClass(it.wr - hero.wr)">{{ deltaFmt(it.wr - hero.wr) }}</td>
+              <td :class="deltaClass(it.wr - aggregated.wr)">{{ deltaFmt(it.wr - aggregated.wr) }}</td>
             </tr>
           </tbody>
         </table>
@@ -155,7 +181,7 @@
               <td>{{ e.name }}</td>
               <td class="wr" :class="wrClass(e.wr)">{{ (e.wr*100).toFixed(1) }}%</td>
               <td>{{ e.games }}</td>
-              <td>{{ (e.games/hero.total_games*100).toFixed(0) }}%</td>
+              <td>{{ aggregated.total_games ? (e.games/aggregated.total_games*100).toFixed(0) : 0 }}%</td>
             </tr>
           </tbody>
         </table>
