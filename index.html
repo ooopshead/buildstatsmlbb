@@ -88,6 +88,21 @@
         No matches in selected date range.
       </div>
 
+      <!-- Matchup filter -->
+      <div class="date-filter" style="margin-bottom:12px">
+        <label>vs Hero:</label>
+        <select v-model="enemyFilter" style="padding:5px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px;min-width:180px">
+          <option value="">All opponents</option>
+          <option v-for="e in enemyCounts" :key="e.name" :value="e.name">
+            {{ e.name }} ({{ e.games }}g)
+          </option>
+        </select>
+        <span v-if="enemyFilter" style="font-size:12px;color:var(--text2)">
+          → {{ aggregated.total_games }}g vs {{ enemyFilter }}
+        </span>
+        <button v-if="enemyFilter" class="date-preset" @click="enemyFilter=''">Clear</button>
+      </div>
+
       <!-- Tabs -->
       <div class="tabs">
         <div class="tab" :class="{active: tab==='items'}" @click="tab='items'">Items</div>
@@ -95,6 +110,8 @@
         <div class="tab" :class="{active: tab==='emblems'}" @click="tab='emblems'">Emblems</div>
         <div class="tab" :class="{active: tab==='talents'}" @click="tab='talents'">Talents</div>
         <div class="tab" :class="{active: tab==='emb_tal'}" @click="tab='emb_tal'">Emblem+Talents</div>
+        <div class="tab" :class="{active: tab==='spells'}" @click="tab='spells'">Battle Spells</div>
+        <div class="tab" :class="{active: tab==='matchups'}" @click="tab='matchups'">Matchups</div>
         <div class="tab" :class="{active: tab==='players'}" @click="tab='players'">Players</div>
       </div>
 
@@ -260,6 +277,123 @@
         </table>
         <div v-if="sortedEmbTal.length===0" style="color:var(--text2);padding:20px">
           No emblem+talent combos with enough games.
+        </div>
+      </div>
+
+      <!-- BATTLE SPELLS TAB -->
+      <div v-if="tab==='spells'" class="section">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th></th>
+              <th>Battle Spell</th>
+              <th @click="sortSpells('wr')">WR</th>
+              <th @click="sortSpells('games')">Games</th>
+              <th>Pick%</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="s in sortedSpells" :key="s.name">
+              <td><img class="icon" :src="spellIcon(s.name)"
+                       @error="$event.target.style.display='none'"></td>
+              <td>{{ s.name }}</td>
+              <td class="wr" :class="wrClass(s.wr)">{{ (s.wr*100).toFixed(1) }}%</td>
+              <td>{{ s.games }}</td>
+              <td>{{ aggregated.total_games ? (s.games/aggregated.total_games*100).toFixed(0) : 0 }}%</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- MATCHUPS TAB -->
+      <div v-if="tab==='matchups'" class="section">
+        <p style="color:var(--text2);font-size:13px;margin-bottom:12px">
+          <span v-if="!enemyFilter">Pick an opponent from the <strong>vs Hero</strong> selector above to see best builds/items/emblems/spells against them.</span>
+          <span v-else>Showing stats for {{ hero.name }} vs <strong>{{ enemyFilter }}</strong> ({{ aggregated.total_games }} games, {{ (aggregated.wr*100).toFixed(1) }}% WR)</span>
+        </p>
+        <div class="matchup-grid" v-if="enemyFilter && aggregated.total_games>0">
+          <div class="matchup-block">
+            <div class="section-title">Top Items</div>
+            <table class="data-table">
+              <tbody>
+                <tr v-for="it in sortedItems.slice(0,8)" :key="it.name">
+                  <td style="width:36px"><img class="icon" :src="itemIconByName(it.name)"
+                                              @error="$event.target.style.display='none'"></td>
+                  <td>{{ it.name }}</td>
+                  <td class="wr" :class="wrClass(it.wr)">{{ (it.wr*100).toFixed(1) }}%</td>
+                  <td>{{ it.games }}g</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="matchup-block">
+            <div class="section-title">Top Builds</div>
+            <div class="filters" style="margin-bottom:8px">
+              <label>Size:</label>
+              <select v-model="comboSize">
+                <option value="6">Full (6)</option>
+                <option value="5">5</option>
+                <option value="4">4</option>
+                <option value="3">3</option>
+              </select>
+            </div>
+            <table class="data-table">
+              <tbody>
+                <tr v-for="(c,i) in sortedCombos.slice(0,5)" :key="i">
+                  <td>
+                    <div class="combo-items">
+                      <img v-for="n in c.items" :key="n" :src="itemIconByName(n)" :title="n"
+                           @error="$event.target.style.display='none'">
+                    </div>
+                  </td>
+                  <td class="wr" :class="wrClass(c.wr)">{{ (c.wr*100).toFixed(1) }}%</td>
+                  <td>{{ c.games }}g</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="matchup-block">
+            <div class="section-title">Top Emblems</div>
+            <table class="data-table">
+              <tbody>
+                <tr v-for="e in sortedEmblems.slice(0,5)" :key="e.name">
+                  <td style="width:36px"><img class="icon" :src="emblemIcon(e.id)" v-if="e.id"></td>
+                  <td>{{ e.name }}</td>
+                  <td class="wr" :class="wrClass(e.wr)">{{ (e.wr*100).toFixed(1) }}%</td>
+                  <td>{{ e.games }}g</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="matchup-block">
+            <div class="section-title">Top Battle Spells</div>
+            <table class="data-table">
+              <tbody>
+                <tr v-for="s in sortedSpells.slice(0,5)" :key="s.name">
+                  <td style="width:36px"><img class="icon" :src="spellIcon(s.name)"
+                                              @error="$event.target.style.display='none'"></td>
+                  <td>{{ s.name }}</td>
+                  <td class="wr" :class="wrClass(s.wr)">{{ (s.wr*100).toFixed(1) }}%</td>
+                  <td>{{ s.games }}g</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div v-else-if="enemyFilter && aggregated.total_games===0" style="color:var(--text2);padding:20px">
+          No games found vs {{ enemyFilter }} (try clearing date filter).
+        </div>
+        <div v-else>
+          <div class="section-title">Most-faced opponents</div>
+          <div class="hero-grid" style="grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));">
+            <div class="hero-tile" v-for="e in enemyCounts.slice(0,40)" :key="e.name"
+                 @click="enemyFilter=e.name">
+              <img :src="heroIcon(e.name)" :alt="e.name"
+                   @error="$event.target.src='img/heroes/unknown.png'" style="width:56px;height:56px">
+              <div class="name" style="font-size:12px">{{ e.name }}</div>
+              <div class="stats">{{ e.games }}g</div>
+            </div>
+          </div>
         </div>
       </div>
 

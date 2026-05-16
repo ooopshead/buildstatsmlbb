@@ -30,6 +30,22 @@ function* combinations(arr, k) {
 const TOP_COMBOS = 20;
 const TOP_PLAYERS = 30;
 
+// Map a match's battle spell to retribution variant if applicable.
+// Hunter-boot prefix → retribution type:
+//   Ice Hunter      → Ice Retribution
+//   Flame Hunter    → Flame Retribution
+//   Behemoth Hunter → Bloody Retribution
+function effectiveSpell(m) {
+  if (m.s !== 'Retribution') return m.s;
+  for (const n of (m.items || [])) {
+    if (!n) continue;
+    if (n.startsWith('Ice Hunter')) return 'Ice Retribution';
+    if (n.startsWith('Flame Hunter')) return 'Flame Retribution';
+    if (n.startsWith('Behemoth Hunter')) return 'Bloody Retribution';
+  }
+  return 'Retribution';
+}
+
 function aggregate(matches) {
   const itemMap = new Map();
   const comboMap = { 3: new Map(), 4: new Map(), 5: new Map(), 6: new Map() };
@@ -37,6 +53,7 @@ function aggregate(matches) {
   const talentMap = new Map();
   const embTalMap = new Map();
   const playerMap = new Map();
+  const spellMap = new Map();
   let total = matches.length, wins = 0;
 
   for (const m of matches) {
@@ -81,6 +98,12 @@ function aggregate(matches) {
         };
         embTalMap.set(key, v);
       }
+      v.wins += m.w; v.games++;
+    }
+    const spellName = effectiveSpell(m);
+    if (spellName) {
+      let v = spellMap.get(spellName);
+      if (!v) { v = { wins: 0, games: 0, name: spellName }; spellMap.set(spellName, v); }
       v.wins += m.w; v.games++;
     }
     const pn = m.p || 'Unknown';
@@ -178,10 +201,20 @@ function aggregate(matches) {
   }
   players.sort((a, b) => b.games - a.games || b.wlb - a.wlb);
 
+  const spells = [];
+  for (const v of spellMap.values()) {
+    spells.push({
+      name: v.name, games: v.games, wins: v.wins,
+      wr: v.games ? v.wins / v.games : 0, wlb: wilsonLower(v.wins, v.games),
+    });
+  }
+  spells.sort((a, b) => b.games - a.games || b.wlb - a.wlb);
+
   return {
     total_games: total, wins, wr: total ? wins / total : 0,
     items, item_combos, emblems, talents, emblem_talent_combos,
     players: players.slice(0, TOP_PLAYERS),
+    spells,
   };
 }
 
@@ -203,6 +236,12 @@ createApp({
     const dateTo = ref('');
     const dateMin = ref('');
     const dateMax = ref('');
+
+    // Matchup filter (per-hero detail view)
+    const enemyFilter = ref('');
+
+    // Sorting per table
+    const spellSort = ref({ key: 'games', dir: -1 });
 
     // Sorting state per table
     const itemSort = ref({ key: 'wlb', dir: -1 });
@@ -270,6 +309,7 @@ createApp({
         dateMax.value = dates[dates.length - 1] || '';
         dateFrom.value = '';
         dateTo.value = '';
+        enemyFilter.value = '';
         window.location.hash = `#/hero/${h.slug}`;
       } catch(e) {
         console.error('Failed to load hero', e);
@@ -468,12 +508,27 @@ createApp({
     const filteredMatches = computed(() => {
       const ms = hero.value?.matches || [];
       const from = dateFrom.value, to = dateTo.value;
-      if (!from && !to) return ms;
+      const enemy = enemyFilter.value;
+      if (!from && !to && !enemy) return ms;
       return ms.filter(m => {
         if (from && (!m.d || m.d < from)) return false;
         if (to && (!m.d || m.d > to)) return false;
+        if (enemy && !(m.enemies || []).includes(enemy)) return false;
         return true;
       });
+    });
+
+    const enemyCounts = computed(() => {
+      const counts = new Map();
+      const ms = hero.value?.matches || [];
+      for (const m of ms) {
+        for (const e of m.enemies || []) {
+          counts.set(e, (counts.get(e) || 0) + 1);
+        }
+      }
+      return [...counts.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .map(([name, games]) => ({ name, games }));
     });
 
     const aggregated = computed(() => aggregate(filteredMatches.value));
@@ -521,6 +576,24 @@ createApp({
     const heroPlayers = computed(() => aggregated.value.players);
     const sortedPlayers = makeSorter(heroPlayers, playerSort);
 
+    const heroSpells = computed(() => aggregated.value.spells || []);
+    const sortedSpells = makeSorter(heroSpells, spellSort);
+
+    function spellIcon(name) {
+      if (!name) return '';
+      if (name === 'Ice Retribution') return 'img/battle_spells/Item_Ice_Retribution.png';
+      if (name === 'Flame Retribution') return 'img/battle_spells/Item_Flame_Retribution.png';
+      if (name === 'Bloody Retribution') return 'img/battle_spells/Item_Bloody_Retribution.png';
+      return `img/battle_spells/${name}.png`;
+    }
+    function heroIcon(name) {
+      const slug = (name || '').toLowerCase().replace(/ /g,'_').replace(/\./g,'_').replace(/'/g,'').replace(/\//g,'_');
+      return `img/heroes/${slug}.png`;
+    }
+    function heroSlugFromName(name) {
+      return (name || '').toLowerCase().replace(/ /g,'_').replace(/\./g,'_').replace(/'/g,'').replace(/\//g,'_');
+    }
+
     // --- sort togglers ---
     function toggleSort(state, key) {
       if (state.value.key === key) state.value = { key, dir: -state.value.dir };
@@ -532,6 +605,7 @@ createApp({
     const sortTalents = (k) => toggleSort(talentSort, k);
     const sortEmbTal = (k) => toggleSort(embTalSort, k);
     const sortPlayers = (k) => toggleSort(playerSort, k);
+    const sortSpells = (k) => toggleSort(spellSort, k);
 
     // --- icon helpers ---
     function itemIcon(id) {
@@ -596,12 +670,13 @@ createApp({
       view, search, sortBy, minGames, heroes, hero, tab, loading,
       comboSize, talentClassFilter, talentTypeFilter,
       dateFrom, dateTo, dateMin, dateMax, setDatePreset,
+      enemyFilter, enemyCounts,
       filteredMatches, aggregated,
       filteredHeroes, sortedItems, sortedCombos, sortedEmblems,
-      sortedTalents, sortedEmbTal, sortedPlayers, talentClasses,
+      sortedTalents, sortedEmbTal, sortedPlayers, sortedSpells, talentClasses,
       openHero, goHome, toggleAdmin,
-      sortItems, sortCombos, sortEmblems, sortTalents, sortEmbTal, sortPlayers,
-      itemIcon, itemIconByName, runeIcon, emblemIcon,
+      sortItems, sortCombos, sortEmblems, sortTalents, sortEmbTal, sortPlayers, sortSpells,
+      itemIcon, itemIconByName, runeIcon, emblemIcon, spellIcon, heroIcon, heroSlugFromName,
       wrClass, deltaFmt, deltaClass,
       // Admin
       tournaments, uploading, uploadMsg, uploadError, dragOver,

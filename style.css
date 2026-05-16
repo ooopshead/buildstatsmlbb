@@ -251,6 +251,22 @@ a:hover { text-decoration: underline; }
 .wr-mid { color: var(--yellow); }
 .wr-low { color: var(--red); }
 
+/* Matchup grid */
+.matchup-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+}
+.matchup-block {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 14px;
+  border: 1px solid var(--border);
+}
+.matchup-block .section-title { margin-bottom: 10px; font-size: 14px; }
+.matchup-block .data-table { font-size: 12px; }
+.matchup-block .data-table td { padding: 4px 6px; }
+
 /* Combo items inline */
 .combo-items { display: flex; gap: 3px; flex-wrap: wrap; align-items: center; }
 .combo-items img { width: 26px; height: 26px; border-radius: 4px; }
