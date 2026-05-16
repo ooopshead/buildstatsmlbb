@@ -379,6 +379,29 @@
               </tbody>
             </table>
           </div>
+          <div class="matchup-block" style="grid-column: 1 / -1">
+            <div class="section-title">Top Emblem + Talents</div>
+            <table class="data-table">
+              <tbody>
+                <tr v-for="(et,i) in sortedEmbTal.slice(0,5)" :key="i">
+                  <td style="width:36px"><img class="icon-sm" :src="emblemIcon(et.emblem_id)" v-if="et.emblem_id"></td>
+                  <td style="white-space:nowrap">{{ et.emblem }}</td>
+                  <td>
+                    <div class="talent-combo">
+                      <template v-for="t in et.talents" :key="t.id">
+                        <img :src="runeIcon(t.id)" :title="t.name" class="icon-sm">
+                      </template>
+                      <span style="font-size:11px;color:var(--text2);margin-left:4px">
+                        {{ et.talents.map(t=>t.name).join(' + ') }}
+                      </span>
+                    </div>
+                  </td>
+                  <td class="wr" :class="wrClass(et.wr)">{{ (et.wr*100).toFixed(1) }}%</td>
+                  <td>{{ et.games }}g</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
         <div v-else-if="enemyFilter && aggregated.total_games===0" style="color:var(--text2);padding:20px">
           No games found vs {{ enemyFilter }} (try clearing date filter).
