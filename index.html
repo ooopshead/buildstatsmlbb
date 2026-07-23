@@ -35,7 +35,7 @@
         <div class="hero-tile" v-for="h in filteredHeroes" :key="h.slug"
              @click="openHero(h)" :class="{'no-data': h.games===0}">
           <img :src="h.portrait" :alt="h.name" loading="lazy"
-               @error="$event.target.src='img/heroes/unknown.png'">
+               @error="if(!$event.target.dataset.fb){$event.target.dataset.fb=1;$event.target.src='img/heroes/unknown.png'}">
           <div class="name">{{ h.name }}</div>
           <div class="stats" v-if="h.games > 0">
             {{ h.games }}g &bull;
@@ -52,7 +52,7 @@
 
       <div class="hero-header">
         <img :src="hero.portrait" :alt="hero.name"
-             @error="$event.target.src='img/heroes/unknown.png'">
+             @error="if(!$event.target.dataset.fb){$event.target.dataset.fb=1;$event.target.src='img/heroes/unknown.png'}">
         <div class="info">
           <h2>{{ hero.name }}</h2>
           <div class="baseline">
@@ -412,7 +412,7 @@
             <div class="hero-tile" v-for="e in enemyCounts.slice(0,40)" :key="e.name"
                  @click="enemyFilter=e.name">
               <img :src="heroIcon(e.name)" :alt="e.name"
-                   @error="$event.target.src='img/heroes/unknown.png'" style="width:56px;height:56px">
+                   @error="if(!$event.target.dataset.fb){$event.target.dataset.fb=1;$event.target.src='img/heroes/unknown.png'}" style="width:56px;height:56px">
               <div class="name" style="font-size:12px">{{ e.name }}</div>
               <div class="stats">{{ e.games }}g</div>
             </div>
