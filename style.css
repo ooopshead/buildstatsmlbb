@@ -362,6 +362,58 @@ code { background: var(--accent2); padding: 2px 6px; border-radius: 3px; font-si
 }
 .admin-input:focus { border-color: var(--accent); outline: none; }
 
+/* Combat stats — leaderboard */
+.stats-hint {
+  font-size: 12px; color: var(--text2);
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 10px 14px; margin-bottom: 14px;
+  line-height: 1.5;
+}
+.table-scroll { overflow-x: auto; }
+.stat-table { min-width: 760px; }
+.stat-table th, .stat-table td { text-align: right; }
+.stat-table th:first-child, .stat-table td.hero-cell { text-align: left; }
+.stat-table td { white-space: nowrap; }
+.stat-table td.hero-cell { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.stat-table td.hero-cell img.icon {
+  width: 30px; height: 30px; border-radius: 50%;
+  border: 1px solid var(--accent2); margin: 0; flex: none;
+}
+
+/* Combat stats — per-hero cards */
+.stat-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+}
+.stat-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+.stat-card .sc-label {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
+  color: var(--text2); margin-bottom: 6px;
+}
+.stat-card .sc-val { font-size: 24px; font-weight: 700; color: var(--text); }
+.stat-card .sc-sub { font-size: 11px; color: var(--text2); margin-top: 4px; }
+
+/* Combat-metric selector + injected column */
+.metric-bar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-bottom: 14px; padding: 8px 14px;
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+}
+.metric-bar label { font-size: 13px; font-weight: 600; color: var(--text2); }
+.metric-bar select {
+  padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border);
+  background: var(--bg); color: var(--text); font-size: 13px;
+}
+.metric-hint { font-size: 11px; color: var(--text2); }
+.data-table th.metric-th { color: var(--accent); }
+.data-table td.metric-cell { color: var(--accent); font-weight: 700; white-space: nowrap; }
+
 /* Responsive */
 @media (max-width: 768px) {
   .hero-grid { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); }

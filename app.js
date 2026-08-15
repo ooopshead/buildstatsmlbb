@@ -62,8 +62,9 @@ function aggregate(matches) {
     const itemNames = (m.items || []).filter(Boolean);
     const sortedItems = [...itemNames].sort();
     for (const name of itemNames) {
-      const v = itemMap.get(name) || [0, 0];
+      const v = itemMap.get(name) || [0, 0, null];
       v[0] += m.w; v[1]++;
+      if (m.cs) v[2] = csAdd(v[2], m.cs);
       itemMap.set(name, v);
     }
     for (const k of [3, 4, 5, 6]) {
@@ -71,20 +72,23 @@ function aggregate(matches) {
         for (const combo of combinations(sortedItems, k)) {
           const key = combo.join('');
           let v = comboMap[k].get(key);
-          if (!v) { v = { wins: 0, games: 0, items: combo }; comboMap[k].set(key, v); }
+          if (!v) { v = { wins: 0, games: 0, items: combo, cs: null }; comboMap[k].set(key, v); }
           v.wins += m.w; v.games++;
+          if (m.cs) v.cs = csAdd(v.cs, m.cs);
         }
       }
     }
     if (m.e) {
       let v = emblemMap.get(m.e);
-      if (!v) { v = { wins: 0, games: 0, eid: m.eid, name: m.e }; emblemMap.set(m.e, v); }
+      if (!v) { v = { wins: 0, games: 0, eid: m.eid, name: m.e, cs: null }; emblemMap.set(m.e, v); }
       v.wins += m.w; v.games++;
+      if (m.cs) v.cs = csAdd(v.cs, m.cs);
     }
     for (const t of m.t || []) {
       let v = talentMap.get(t.id);
-      if (!v) { v = { wins: 0, games: 0, id: t.id, name: t.name, class: t.class, type: t.type }; talentMap.set(t.id, v); }
+      if (!v) { v = { wins: 0, games: 0, id: t.id, name: t.name, class: t.class, type: t.type, cs: null }; talentMap.set(t.id, v); }
       v.wins += m.w; v.games++;
+      if (m.cs) v.cs = csAdd(v.cs, m.cs);
     }
     if (m.e && m.t && m.t.length) {
       const sortedTal = [...m.t].sort((a, b) => (a.id || '').localeCompare(b.id || ''));
@@ -94,17 +98,19 @@ function aggregate(matches) {
       if (!v) {
         v = {
           wins: 0, games: 0, eid: m.eid, emblem: m.e,
-          talents: sortedTal.map(t => ({ id: t.id, name: t.name })),
+          talents: sortedTal.map(t => ({ id: t.id, name: t.name })), cs: null,
         };
         embTalMap.set(key, v);
       }
       v.wins += m.w; v.games++;
+      if (m.cs) v.cs = csAdd(v.cs, m.cs);
     }
     const spellName = effectiveSpell(m);
     if (spellName) {
       let v = spellMap.get(spellName);
-      if (!v) { v = { wins: 0, games: 0, name: spellName }; spellMap.set(spellName, v); }
+      if (!v) { v = { wins: 0, games: 0, name: spellName, cs: null }; spellMap.set(spellName, v); }
       v.wins += m.w; v.games++;
+      if (m.cs) v.cs = csAdd(v.cs, m.cs);
     }
     const pn = m.p || 'Unknown';
     let p = playerMap.get(pn);
@@ -119,8 +125,8 @@ function aggregate(matches) {
   }
 
   const items = [];
-  for (const [name, [w, g]] of itemMap) {
-    items.push({ id: null, name, games: g, wins: w, wr: g ? w / g : 0, wlb: wilsonLower(w, g) });
+  for (const [name, [w, g, cs]] of itemMap) {
+    items.push({ id: null, name, games: g, wins: w, wr: g ? w / g : 0, wlb: wilsonLower(w, g), cs });
   }
 
   const item_combos = {};
@@ -129,7 +135,7 @@ function aggregate(matches) {
     for (const v of comboMap[k].values()) {
       arr.push({
         items: v.items, games: v.games, wins: v.wins,
-        wr: v.games ? v.wins / v.games : 0, wlb: wilsonLower(v.wins, v.games),
+        wr: v.games ? v.wins / v.games : 0, wlb: wilsonLower(v.wins, v.games), cs: v.cs,
       });
     }
     arr.sort((a, b) => b.wlb - a.wlb || b.games - a.games);
@@ -140,7 +146,7 @@ function aggregate(matches) {
   for (const v of emblemMap.values()) {
     emblems.push({
       id: v.eid, name: v.name, games: v.games, wins: v.wins,
-      wr: v.games ? v.wins / v.games : 0, wlb: wilsonLower(v.wins, v.games),
+      wr: v.games ? v.wins / v.games : 0, wlb: wilsonLower(v.wins, v.games), cs: v.cs,
     });
   }
 
@@ -149,7 +155,7 @@ function aggregate(matches) {
     talents.push({
       id: v.id, name: v.name, class: v.class, type: v.type,
       games: v.games, wins: v.wins,
-      wr: v.games ? v.wins / v.games : 0, wlb: wilsonLower(v.wins, v.games),
+      wr: v.games ? v.wins / v.games : 0, wlb: wilsonLower(v.wins, v.games), cs: v.cs,
     });
   }
 
@@ -158,7 +164,7 @@ function aggregate(matches) {
     emblem_talent_combos.push({
       emblem_id: v.eid, emblem: v.emblem, talents: v.talents,
       games: v.games, wins: v.wins,
-      wr: v.games ? v.wins / v.games : 0, wlb: wilsonLower(v.wins, v.games),
+      wr: v.games ? v.wins / v.games : 0, wlb: wilsonLower(v.wins, v.games), cs: v.cs,
     });
   }
 
@@ -205,7 +211,7 @@ function aggregate(matches) {
   for (const v of spellMap.values()) {
     spells.push({
       name: v.name, games: v.games, wins: v.wins,
-      wr: v.games ? v.wins / v.games : 0, wlb: wilsonLower(v.wins, v.games),
+      wr: v.games ? v.wins / v.games : 0, wlb: wilsonLower(v.wins, v.games), cs: v.cs,
     });
   }
   spells.sort((a, b) => b.games - a.games || b.wlb - a.wlb);
@@ -217,6 +223,86 @@ function aggregate(matches) {
     spells,
   };
 }
+
+// Aggregate combat stats over a set of matches (each carrying an optional m.cs).
+// Counts -> per-game averages; ratios/shares/KDA -> pooled (sum/sum), so 0-death
+// games don't blow up. Mirrors combat_aggregate() in process_data.py.
+function combatAggregate(matches) {
+  const sr = (matches || []).filter(m => m.cs);
+  const n = sr.length;
+  if (!n) return null;
+  let sk = 0, sd = 0, sa = 0, sdmg = 0, sdt = 0, sg = 0, ssec = 0, std = 0;
+  for (const m of sr) {
+    const c = m.cs;
+    sk += c.k; sd += c.d; sa += c.a; sdmg += c.dmg;
+    sdt += c.dt; sg += c.g; ssec += c.sec; std += c.td;
+  }
+  return {
+    n,
+    k: sk / n, d: sd / n, a: sa / n,
+    kda: sd ? (sk + sa) / sd : (sk + sa),
+    dmg: sdmg / n,
+    dpm: ssec ? sdmg / (ssec / 60) : 0,
+    dmg_gold: sg ? sdmg / sg * 100 : 0,     // percent
+    dmg_share: std ? sdmg / std * 100 : 0,  // percent
+    dtaken: sdt / n,
+    dt_death: sd ? sdt / sd : sdt,
+  };
+}
+
+// Compact number formatting for the stats tables.
+function fmtK(n) {
+  if (n == null) return '—';
+  const a = Math.abs(n);
+  if (a >= 1000) return (n / 1000).toFixed(a >= 10000 ? 1 : 2) + 'k';
+  return Math.round(n).toString();
+}
+function fmtInt(n) { return n == null ? '—' : Math.round(n).toLocaleString('en-US'); }
+function fmt1(n) { return n == null ? '—' : n.toFixed(1); }
+function fmt2(n) { return n == null ? '—' : n.toFixed(2); }
+function fmtPct(n) { return n == null ? '—' : n.toFixed(1) + '%'; }
+
+// Accumulate per-match combat stats into a running sum bucket (for per-row combat
+// aggregates on builds/emblems/talents). `acc` may be undefined on first call.
+function csAdd(acc, cs) {
+  if (!acc) acc = { n: 0, k: 0, d: 0, a: 0, dmg: 0, dt: 0, g: 0, sec: 0, td: 0 };
+  acc.n++; acc.k += cs.k; acc.d += cs.d; acc.a += cs.a; acc.dmg += cs.dmg;
+  acc.dt += cs.dt; acc.g += cs.g; acc.sec += cs.sec; acc.td += cs.td;
+  return acc;
+}
+
+// Compute one combat metric from a sum bucket. Counts -> per-game avg; ratios pooled.
+function metricValue(acc, key) {
+  if (!acc || !acc.n) return null;
+  const n = acc.n;
+  switch (key) {
+    case 'kda':       return acc.d ? (acc.k + acc.a) / acc.d : (acc.k + acc.a);
+    case 'dmg':       return acc.dmg / n;
+    case 'dpm':       return acc.sec ? acc.dmg / (acc.sec / 60) : 0;
+    case 'dmg_gold':  return acc.g ? acc.dmg / acc.g * 100 : 0;
+    case 'dmg_share': return acc.td ? acc.dmg / acc.td * 100 : 0;
+    case 'dtaken':    return acc.dt / n;
+    case 'dt_death':  return acc.d ? acc.dt / acc.d : acc.dt;
+    case 'k':         return acc.k / n;
+    case 'd':         return acc.d / n;
+    case 'a':         return acc.a / n;
+  }
+  return null;
+}
+
+// Selectable combat metrics for the builds/emblems/talents tables (dropdown).
+const METRICS = [
+  { key: 'kda',       label: 'KDA',          fmt: fmt2 },
+  { key: 'dmg',       label: 'Damage',       fmt: fmtInt },
+  { key: 'dpm',       label: 'DMG / min',    fmt: fmtInt },
+  { key: 'dmg_gold',  label: 'DMG / gold',   fmt: fmtPct },
+  { key: 'dmg_share', label: '% team DMG',   fmt: fmtPct },
+  { key: 'dtaken',    label: 'DMG taken',    fmt: fmtInt },
+  { key: 'dt_death',  label: 'Taken / death',fmt: fmtInt },
+  { key: 'k',         label: 'Avg kills',    fmt: fmt1 },
+  { key: 'd',         label: 'Avg deaths',   fmt: fmt1 },
+  { key: 'a',         label: 'Avg assists',  fmt: fmt1 },
+];
 
 createApp({
   setup() {
@@ -250,6 +336,13 @@ createApp({
     const talentSort = ref({ key: 'wlb', dir: -1 });
     const embTalSort = ref({ key: 'wlb', dir: -1 });
     const playerSort = ref({ key: 'games', dir: -1 });
+
+    // Combat-stats leaderboard state
+    const statSort = ref({ key: 'dmg', dir: -1 });
+    const statMinGames = ref(3);
+
+    // Optional combat-metric column shown in the build/emblem/talent tables ('' = off)
+    const metric = ref('');
 
     // Talent filters
     const talentClassFilter = ref('');
@@ -322,6 +415,13 @@ createApp({
       view.value = 'list';
       hero.value = null;
       window.location.hash = '';
+    }
+
+    function goStats() {
+      view.value = 'stats';
+      hero.value = null;
+      window.location.hash = '#/stats';
+      nextTick(() => window.scrollTo(0, 0));
     }
 
     function setDatePreset(preset) {
@@ -504,6 +604,29 @@ createApp({
       return list;
     });
 
+    // --- computed: combat-stats leaderboard (one row per hero) ---
+    const statRows = computed(() => {
+      const rows = heroes.value
+        .filter(h => h.cs && h.games >= statMinGames.value)
+        .map(h => ({
+          slug: h.slug, name: h.name, portrait: h.portrait,
+          games: h.games, wr: h.wr,
+          ...h.cs,   // n, k, d, a, kda, dmg, dpm, dmg_gold, dmg_share, dtaken, dt_death
+        }));
+      const { key, dir } = statSort.value;
+      rows.sort((a, b) => {
+        const av = a[key], bv = b[key];
+        if (typeof av === 'string') return dir * av.localeCompare(bv);
+        return dir * ((av ?? 0) - (bv ?? 0));
+      });
+      return rows;
+    });
+    function sortStats(k) { toggleSort(statSort, k); }
+    function statCls(k) {
+      if (statSort.value.key !== k) return '';
+      return statSort.value.dir < 0 ? 'sort-desc' : 'sort-asc';
+    }
+
     // --- computed: filtered matches + aggregated stats ---
     const filteredMatches = computed(() => {
       const ms = hero.value?.matches || [];
@@ -533,14 +656,23 @@ createApp({
 
     const aggregated = computed(() => aggregate(filteredMatches.value));
 
+    // Combat stats for the current hero, over the same date/enemy-filtered matches.
+    const heroCombat = computed(() => combatAggregate(filteredMatches.value));
+
     // --- computed: hero detail tables ---
     function makeSorter(data, state) {
       return computed(() => {
         if (!data.value) return [];
         const arr = [...data.value];
         const { key, dir } = state.value;
+        const mk = metric.value;
         arr.sort((a, b) => {
-          const av = a[key], bv = b[key];
+          let av, bv;
+          if (key === 'mv') {
+            av = metricValue(a.cs, mk); bv = metricValue(b.cs, mk);
+            if (av == null) av = -Infinity;
+            if (bv == null) bv = -Infinity;
+          } else { av = a[key]; bv = b[key]; }
           if (typeof av === 'string') return dir * av.localeCompare(bv);
           return dir * (av - bv);
         });
@@ -637,12 +769,28 @@ createApp({
       return d >= 0 ? 'wr-high' : 'wr-low';
     }
 
+    // Label + formatted value for the currently selected combat metric column.
+    const metricLabel = computed(() => {
+      const m = METRICS.find(x => x.key === metric.value);
+      return m ? m.label : '';
+    });
+    function mvFmt(row) {
+      const m = METRICS.find(x => x.key === metric.value);
+      if (!m) return '';
+      const v = metricValue(row && row.cs, metric.value);
+      return v == null ? '—' : m.fmt(v);
+    }
+
     // --- routing ---
     async function handleRoute() {
       const hash = window.location.hash;
       if (hash === '#/admin') {
         view.value = 'admin';
         loadTournaments();
+        return;
+      }
+      if (hash === '#/stats') {
+        view.value = 'stats';
         return;
       }
       const m = hash.match(/^#\/hero\/(.+)$/);
@@ -671,13 +819,15 @@ createApp({
       comboSize, talentClassFilter, talentTypeFilter,
       dateFrom, dateTo, dateMin, dateMax, setDatePreset,
       enemyFilter, enemyCounts,
-      filteredMatches, aggregated,
+      filteredMatches, aggregated, heroCombat,
       filteredHeroes, sortedItems, sortedCombos, sortedEmblems,
       sortedTalents, sortedEmbTal, sortedPlayers, sortedSpells, talentClasses,
-      openHero, goHome, toggleAdmin,
+      statRows, statSort, statMinGames, sortStats, statCls,
+      metric, metrics: METRICS, metricLabel, mvFmt,
+      openHero, goHome, goStats, toggleAdmin,
       sortItems, sortCombos, sortEmblems, sortTalents, sortEmbTal, sortPlayers, sortSpells,
       itemIcon, itemIconByName, runeIcon, emblemIcon, spellIcon, heroIcon, heroSlugFromName,
-      wrClass, deltaFmt, deltaClass,
+      wrClass, deltaFmt, deltaClass, fmtK, fmtInt, fmt1, fmt2, fmtPct,
       // Admin
       tournaments, uploading, uploadMsg, uploadError, dragOver,
       deleting, rebuilding, rebuildOutput,

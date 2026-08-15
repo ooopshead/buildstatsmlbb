@@ -12,6 +12,8 @@
   <div class="header">
     <h1 @click="goHome">MLBB Pro Stats</h1>
     <input class="search" type="text" placeholder="Search hero..." v-model="search" v-show="view==='list'">
+    <div class="header-btn" :class="{active: view==='list'||view==='hero'}" @click="goHome" style="margin-left:auto">Heroes</div>
+    <div class="header-btn" :class="{active: view==='stats'}" @click="goStats">&#128202; Stats</div>
     <div class="header-btn" :class="{active: view==='admin'}" @click="toggleAdmin">
       &#9881; Data
     </div>
@@ -43,6 +45,65 @@
           </div>
           <div class="stats" v-else>No data</div>
         </div>
+      </div>
+    </template>
+
+    <!-- STATS LEADERBOARD VIEW -->
+    <template v-if="view==='stats'">
+      <div class="filters">
+        <div class="section-title" style="margin:0">&#128202; Hero Combat Stats</div>
+        <span style="flex:1"></span>
+        <label>Min games:</label>
+        <input type="number" v-model.number="statMinGames" min="0" max="999" style="width:70px">
+      </div>
+      <div class="stats-hint">
+        Counts (K/D/A, DMG, TKN) are per-game averages. Ratios (KDA, D/G, D%, TKN/D) are pooled.
+        Combat data comes from JSON tournaments only (xls has none). Click a row for hero detail.
+      </div>
+      <div class="table-scroll">
+        <table class="data-table stat-table">
+          <thead>
+            <tr>
+              <th @click="sortStats('name')" :class="statCls('name')">Hero</th>
+              <th @click="sortStats('games')" :class="statCls('games')" title="Games">G</th>
+              <th @click="sortStats('wr')" :class="statCls('wr')" title="Winrate">WR</th>
+              <th @click="sortStats('k')" :class="statCls('k')" title="Avg kills / game">K</th>
+              <th @click="sortStats('d')" :class="statCls('d')" title="Avg deaths / game">D</th>
+              <th @click="sortStats('a')" :class="statCls('a')" title="Avg assists / game">A</th>
+              <th @click="sortStats('kda')" :class="statCls('kda')" title="(sum K + sum A) / sum D">KDA</th>
+              <th @click="sortStats('dmg')" :class="statCls('dmg')" title="Avg hero damage / game">DMG</th>
+              <th @click="sortStats('dpm')" :class="statCls('dpm')" title="Damage per minute">DPM</th>
+              <th @click="sortStats('dmg_gold')" :class="statCls('dmg_gold')" title="Damage per gold">D/G</th>
+              <th @click="sortStats('dmg_share')" :class="statCls('dmg_share')" title="% of team damage">D%</th>
+              <th @click="sortStats('dtaken')" :class="statCls('dtaken')" title="Avg damage taken / game">TKN</th>
+              <th @click="sortStats('dt_death')" :class="statCls('dt_death')" title="Damage taken per death">TKN/D</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="r in statRows" :key="r.slug" @click="openHero(r)" style="cursor:pointer">
+              <td class="hero-cell">
+                <img class="icon" :src="r.portrait" :alt="r.name" loading="lazy"
+                     @error="if(!$event.target.dataset.fb){$event.target.dataset.fb=1;$event.target.src='img/heroes/unknown.png'}">
+                <span>{{ r.name }}</span>
+              </td>
+              <td>{{ r.games }}</td>
+              <td><span class="wr" :class="wrClass(r.wr)">{{ (r.wr*100).toFixed(1) }}%</span></td>
+              <td>{{ fmt1(r.k) }}</td>
+              <td>{{ fmt1(r.d) }}</td>
+              <td>{{ fmt1(r.a) }}</td>
+              <td><b>{{ fmt2(r.kda) }}</b></td>
+              <td>{{ fmtK(r.dmg) }}</td>
+              <td>{{ fmtInt(r.dpm) }}</td>
+              <td>{{ fmtPct(r.dmg_gold) }}</td>
+              <td>{{ fmtPct(r.dmg_share) }}</td>
+              <td>{{ fmtK(r.dtaken) }}</td>
+              <td>{{ fmtK(r.dt_death) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div v-if="!statRows.length" style="color:var(--text2);padding:24px;text-align:center">
+        No heroes with combat data at this threshold. Lower "Min games", or rebuild with JSON tournaments.
       </div>
     </template>
 
@@ -105,6 +166,7 @@
 
       <!-- Tabs -->
       <div class="tabs">
+        <div class="tab" :class="{active: tab==='stats'}" @click="tab='stats'">Stats</div>
         <div class="tab" :class="{active: tab==='items'}" @click="tab='items'">Items</div>
         <div class="tab" :class="{active: tab==='combos'}" @click="tab='combos'">Builds</div>
         <div class="tab" :class="{active: tab==='emblems'}" @click="tab='emblems'">Emblems</div>
@@ -113,6 +175,73 @@
         <div class="tab" :class="{active: tab==='spells'}" @click="tab='spells'">Battle Spells</div>
         <div class="tab" :class="{active: tab==='matchups'}" @click="tab='matchups'">Matchups</div>
         <div class="tab" :class="{active: tab==='players'}" @click="tab='players'">Players</div>
+      </div>
+
+      <!-- Combat-metric selector (adds one column to the tables below) -->
+      <div class="metric-bar" v-if="['items','combos','emblems','talents','emb_tal','spells'].includes(tab)">
+        <label>Combat stat:</label>
+        <select v-model="metric">
+          <option value="">&mdash; none &mdash;</option>
+          <option v-for="m in metrics" :key="m.key" :value="m.key">{{ m.label }}</option>
+        </select>
+        <span class="metric-hint" v-if="metric">
+          per row: counts = avg/game, ratios pooled &middot; click the "{{ metricLabel }}" header to sort
+        </span>
+      </div>
+
+      <!-- STATS TAB -->
+      <div v-if="tab==='stats'" class="section">
+        <div v-if="!heroCombat" style="background:var(--card);padding:20px;border-radius:var(--radius);text-align:center;color:var(--text2)">
+          No combat data for the selected matches. These metrics exist only in JSON tournaments (xls exports have none).
+        </div>
+        <div v-else>
+          <div class="stat-cards">
+            <div class="stat-card">
+              <div class="sc-label">KDA</div>
+              <div class="sc-val" :class="heroCombat.kda>=4?'wr-high':(heroCombat.kda>=2.5?'wr-mid':'wr-low')">{{ fmt2(heroCombat.kda) }}</div>
+              <div class="sc-sub">{{ fmt1(heroCombat.k) }} / {{ fmt1(heroCombat.d) }} / {{ fmt1(heroCombat.a) }} avg</div>
+            </div>
+            <div class="stat-card">
+              <div class="sc-label">Damage</div>
+              <div class="sc-val">{{ fmtInt(heroCombat.dmg) }}</div>
+              <div class="sc-sub">avg / game</div>
+            </div>
+            <div class="stat-card">
+              <div class="sc-label">Damage / min</div>
+              <div class="sc-val">{{ fmtInt(heroCombat.dpm) }}</div>
+              <div class="sc-sub">pooled</div>
+            </div>
+            <div class="stat-card">
+              <div class="sc-label">Damage / gold</div>
+              <div class="sc-val">{{ fmtPct(heroCombat.dmg_gold) }}</div>
+              <div class="sc-sub">pooled</div>
+            </div>
+            <div class="stat-card">
+              <div class="sc-label">% of team damage</div>
+              <div class="sc-val">{{ fmtPct(heroCombat.dmg_share) }}</div>
+              <div class="sc-sub">pooled</div>
+            </div>
+            <div class="stat-card">
+              <div class="sc-label">Damage taken</div>
+              <div class="sc-val">{{ fmtInt(heroCombat.dtaken) }}</div>
+              <div class="sc-sub">avg / game</div>
+            </div>
+            <div class="stat-card">
+              <div class="sc-label">Taken / death</div>
+              <div class="sc-val">{{ fmtInt(heroCombat.dt_death) }}</div>
+              <div class="sc-sub">pooled</div>
+            </div>
+            <div class="stat-card">
+              <div class="sc-label">K / D / A</div>
+              <div class="sc-val">{{ fmt1(heroCombat.k) }} / {{ fmt1(heroCombat.d) }} / {{ fmt1(heroCombat.a) }}</div>
+              <div class="sc-sub">avg / game</div>
+            </div>
+          </div>
+          <div class="stats-hint" style="margin-top:14px">
+            Based on {{ heroCombat.n }} game(s) with combat data<span v-if="heroCombat.n < aggregated.total_games"> (of {{ aggregated.total_games }} shown — the rest come from xls without combat stats)</span>.
+            Counts are per-game averages; ratios are pooled. Respects the date &amp; matchup filters above.
+          </div>
+        </div>
       </div>
 
       <!-- ITEMS TAB -->
@@ -124,6 +253,7 @@
               <th @click="sortItems('name')">Item</th>
               <th @click="sortItems('wr')">WR</th>
               <th @click="sortItems('games')">Games</th>
+              <th v-if="metric" @click="sortItems('mv')" class="metric-th">{{ metricLabel }}</th>
               <th>vs base</th>
             </tr>
           </thead>
@@ -134,6 +264,7 @@
               <td>{{ it.name }}</td>
               <td class="wr" :class="wrClass(it.wr)">{{ (it.wr*100).toFixed(1) }}%</td>
               <td>{{ it.games }}</td>
+              <td v-if="metric" class="metric-cell">{{ mvFmt(it) }}</td>
               <td :class="deltaClass(it.wr - aggregated.wr)">{{ deltaFmt(it.wr - aggregated.wr) }}</td>
             </tr>
           </tbody>
@@ -157,6 +288,7 @@
               <th>Build</th>
               <th @click="sortCombos('wr')">WR</th>
               <th @click="sortCombos('games')">Games</th>
+              <th v-if="metric" @click="sortCombos('mv')" class="metric-th">{{ metricLabel }}</th>
             </tr>
           </thead>
           <tbody>
@@ -172,6 +304,7 @@
               </td>
               <td class="wr" :class="wrClass(c.wr)">{{ (c.wr*100).toFixed(1) }}%</td>
               <td>{{ c.games }}</td>
+              <td v-if="metric" class="metric-cell">{{ mvFmt(c) }}</td>
             </tr>
           </tbody>
         </table>
@@ -189,6 +322,7 @@
               <th>Emblem</th>
               <th @click="sortEmblems('wr')">WR</th>
               <th @click="sortEmblems('games')">Games</th>
+              <th v-if="metric" @click="sortEmblems('mv')" class="metric-th">{{ metricLabel }}</th>
               <th>Pick%</th>
             </tr>
           </thead>
@@ -198,6 +332,7 @@
               <td>{{ e.name }}</td>
               <td class="wr" :class="wrClass(e.wr)">{{ (e.wr*100).toFixed(1) }}%</td>
               <td>{{ e.games }}</td>
+              <td v-if="metric" class="metric-cell">{{ mvFmt(e) }}</td>
               <td>{{ aggregated.total_games ? (e.games/aggregated.total_games*100).toFixed(0) : 0 }}%</td>
             </tr>
           </tbody>
@@ -228,6 +363,7 @@
               <th>Type</th>
               <th @click="sortTalents('wr')">WR</th>
               <th @click="sortTalents('games')">Games</th>
+              <th v-if="metric" @click="sortTalents('mv')" class="metric-th">{{ metricLabel }}</th>
             </tr>
           </thead>
           <tbody>
@@ -238,6 +374,7 @@
               <td>{{ t.type }}</td>
               <td class="wr" :class="wrClass(t.wr)">{{ (t.wr*100).toFixed(1) }}%</td>
               <td>{{ t.games }}</td>
+              <td v-if="metric" class="metric-cell">{{ mvFmt(t) }}</td>
             </tr>
           </tbody>
         </table>
@@ -252,6 +389,7 @@
               <th>Talents</th>
               <th @click="sortEmbTal('wr')">WR</th>
               <th @click="sortEmbTal('games')">Games</th>
+              <th v-if="metric" @click="sortEmbTal('mv')" class="metric-th">{{ metricLabel }}</th>
             </tr>
           </thead>
           <tbody>
@@ -272,6 +410,7 @@
               </td>
               <td class="wr" :class="wrClass(et.wr)">{{ (et.wr*100).toFixed(1) }}%</td>
               <td>{{ et.games }}</td>
+              <td v-if="metric" class="metric-cell">{{ mvFmt(et) }}</td>
             </tr>
           </tbody>
         </table>
@@ -289,6 +428,7 @@
               <th>Battle Spell</th>
               <th @click="sortSpells('wr')">WR</th>
               <th @click="sortSpells('games')">Games</th>
+              <th v-if="metric" @click="sortSpells('mv')" class="metric-th">{{ metricLabel }}</th>
               <th>Pick%</th>
             </tr>
           </thead>
@@ -299,6 +439,7 @@
               <td>{{ s.name }}</td>
               <td class="wr" :class="wrClass(s.wr)">{{ (s.wr*100).toFixed(1) }}%</td>
               <td>{{ s.games }}</td>
+              <td v-if="metric" class="metric-cell">{{ mvFmt(s) }}</td>
               <td>{{ aggregated.total_games ? (s.games/aggregated.total_games*100).toFixed(0) : 0 }}%</td>
             </tr>
           </tbody>
