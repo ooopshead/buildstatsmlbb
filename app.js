@@ -304,6 +304,35 @@ const METRICS = [
   { key: 'a',         label: 'Avg assists',  fmt: fmt1 },
 ];
 
+// Sum a list of raw combat buckets ({n,k,d,a,dmg,dt,g,sec,td} | null) into one, or null.
+function poolCs(buckets) {
+  let acc = null;
+  for (const b of buckets) {
+    if (!b) continue;
+    if (!acc) acc = { n: 0, k: 0, d: 0, a: 0, dmg: 0, dt: 0, g: 0, sec: 0, td: 0 };
+    acc.n += b.n; acc.k += b.k; acc.a += b.a; acc.d += b.d; acc.dmg += b.dmg;
+    acc.dt += b.dt; acc.g += b.g; acc.sec += b.sec; acc.td += b.td;
+  }
+  return acc;
+}
+
+// Turn a raw combat sum bucket into finished metrics (same shape as leaderboard cs).
+function finalizeCs(acc) {
+  if (!acc || !acc.n) return null;
+  const n = acc.n;
+  return {
+    n,
+    k: acc.k / n, d: acc.d / n, a: acc.a / n,
+    kda: acc.d ? (acc.k + acc.a) / acc.d : (acc.k + acc.a),
+    dmg: acc.dmg / n,
+    dpm: acc.sec ? acc.dmg / (acc.sec / 60) : 0,
+    dmg_gold: acc.g ? acc.dmg / acc.g * 100 : 0,
+    dmg_share: acc.td ? acc.dmg / acc.td * 100 : 0,
+    dtaken: acc.dt / n,
+    dt_death: acc.d ? acc.dt / acc.d : acc.dt,
+  };
+}
+
 createApp({
   setup() {
     // --- state ---
@@ -343,6 +372,11 @@ createApp({
 
     // Optional combat-metric column shown in the build/emblem/talent tables ('' = off)
     const metric = ref('');
+
+    // Global tournament filter (multi-select, applies to every page)
+    const tourList = ref([]);      // [{id, name, games}]
+    const selTours = ref([]);      // selected tournament ids
+    const tourMenuOpen = ref(false);
 
     // Talent filters
     const talentClassFilter = ref('');
@@ -385,6 +419,19 @@ createApp({
       try {
         const resp = await fetch('data/items_name_index.json');
         if (resp.ok) nameIndex.value = await resp.json();
+      } catch(e) {}
+    }
+
+    async function loadTourList() {
+      try {
+        const resp = await fetch('data/tournaments.json');
+        if (!resp.ok) return;
+        const list = await resp.json();
+        tourList.value = list;
+        // Keep any still-valid current selection; otherwise select all by default.
+        const ids = list.map(t => t.id);
+        const kept = selTours.value.filter(id => ids.includes(id));
+        selTours.value = kept.length ? kept : ids;
       } catch(e) {}
     }
 
@@ -581,6 +628,7 @@ createApp({
         if (data.success) {
           rebuildOutput.value += '\n✓ Rebuild complete! Reloading heroes...';
           await loadHeroes();
+          await loadTourList();
         } else {
           rebuildOutput.value += '\n✗ Rebuild failed (see output above)';
         }
@@ -590,9 +638,48 @@ createApp({
       rebuilding.value = false;
     }
 
+    // --- tournament filter ---
+    const selTourSet = computed(() => new Set(selTours.value));
+    const allToursSelected = computed(() =>
+      tourList.value.length > 0 && selTours.value.length === tourList.value.length);
+    const tourBtnLabel = computed(() => {
+      const n = selTours.value.length, m = tourList.value.length;
+      if (m === 0) return 'Tournaments';
+      if (n === m) return 'All tournaments';
+      if (n === 0) return 'No tournaments';
+      if (n === 1) {
+        const t = tourList.value.find(x => x.id === selTours.value[0]);
+        return t ? t.name : '1 selected';
+      }
+      return `${n} / ${m} tournaments`;
+    });
+    function toggleTour(id) {
+      const i = selTours.value.indexOf(id);
+      if (i >= 0) selTours.value.splice(i, 1);
+      else selTours.value.push(id);
+    }
+    function selectAllTours() { selTours.value = tourList.value.map(t => t.id); }
+    function selectNoneTours() { selTours.value = []; }
+
+    // Recompute a hero's games/wins/wr/cs over only the selected tournaments.
+    function heroAgg(h) {
+      const bt = h.by_tour || {};
+      const set = selTourSet.value;
+      let games = 0, wins = 0;
+      const buckets = [];
+      for (const tid in bt) {
+        if (!set.has(tid)) continue;
+        const b = bt[tid];
+        games += b.g; wins += b.w; buckets.push(b.cs);
+      }
+      return { games, wins, wr: games ? wins / games : 0, cs: finalizeCs(poolCs(buckets)) };
+    }
+    // Hero list with per-tournament-filtered aggregates (drives list + leaderboard).
+    const heroesView = computed(() => heroes.value.map(h => ({ ...h, ...heroAgg(h) })));
+
     // --- computed: hero list ---
     const filteredHeroes = computed(() => {
-      let list = heroes.value.filter(h => {
+      let list = heroesView.value.filter(h => {
         if (minGames.value > 0 && h.games < minGames.value && h.games > 0) return false;
         if (search.value && !h.name.toLowerCase().includes(search.value.toLowerCase())) return false;
         return true;
@@ -606,7 +693,7 @@ createApp({
 
     // --- computed: combat-stats leaderboard (one row per hero) ---
     const statRows = computed(() => {
-      const rows = heroes.value
+      const rows = heroesView.value
         .filter(h => h.cs && h.games >= statMinGames.value)
         .map(h => ({
           slug: h.slug, name: h.name, portrait: h.portrait,
@@ -632,8 +719,11 @@ createApp({
       const ms = hero.value?.matches || [];
       const from = dateFrom.value, to = dateTo.value;
       const enemy = enemyFilter.value;
-      if (!from && !to && !enemy) return ms;
+      const set = selTourSet.value;
+      const tourActive = !allToursSelected.value;
+      if (!from && !to && !enemy && !tourActive) return ms;
       return ms.filter(m => {
+        if (tourActive && !set.has(m.tid)) return false;
         if (from && (!m.d || m.d < from)) return false;
         if (to && (!m.d || m.d > to)) return false;
         if (enemy && !(m.enemies || []).includes(enemy)) return false;
@@ -644,7 +734,10 @@ createApp({
     const enemyCounts = computed(() => {
       const counts = new Map();
       const ms = hero.value?.matches || [];
+      const set = selTourSet.value;
+      const tourActive = !allToursSelected.value;
       for (const m of ms) {
+        if (tourActive && !set.has(m.tid)) continue;
         for (const e of m.enemies || []) {
           counts.set(e, (counts.get(e) || 0) + 1);
         }
@@ -809,6 +902,7 @@ createApp({
     onMounted(async () => {
       await loadHeroes();
       await loadNameIndex();
+      await loadTourList();
       handleRoute();
     });
 
@@ -824,6 +918,8 @@ createApp({
       sortedTalents, sortedEmbTal, sortedPlayers, sortedSpells, talentClasses,
       statRows, statSort, statMinGames, sortStats, statCls,
       metric, metrics: METRICS, metricLabel, mvFmt,
+      tourList, selTours, selTourSet, tourMenuOpen, allToursSelected, tourBtnLabel,
+      toggleTour, selectAllTours, selectNoneTours,
       openHero, goHome, goStats, toggleAdmin,
       sortItems, sortCombos, sortEmblems, sortTalents, sortEmbTal, sortPlayers, sortSpells,
       itemIcon, itemIconByName, runeIcon, emblemIcon, spellIcon, heroIcon, heroSlugFromName,

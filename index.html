@@ -12,7 +12,25 @@
   <div class="header">
     <h1 @click="goHome">MLBB Pro Stats</h1>
     <input class="search" type="text" placeholder="Search hero..." v-model="search" v-show="view==='list'">
-    <div class="header-btn" :class="{active: view==='list'||view==='hero'}" @click="goHome" style="margin-left:auto">Heroes</div>
+    <div class="tour-filter" style="margin-left:auto">
+      <div class="header-btn" :class="{active: tourMenuOpen || !allToursSelected}" @click="tourMenuOpen=!tourMenuOpen">
+        &#127942; {{ tourBtnLabel }} &#9662;
+      </div>
+      <div v-if="tourMenuOpen" class="tour-backdrop" @click="tourMenuOpen=false"></div>
+      <div v-if="tourMenuOpen" class="tour-menu">
+        <div class="tour-menu-actions">
+          <button @click="selectAllTours">All</button>
+          <button @click="selectNoneTours">None</button>
+        </div>
+        <label v-for="t in tourList" :key="t.id" class="tour-opt">
+          <input type="checkbox" :checked="selTourSet.has(t.id)" @change="toggleTour(t.id)">
+          <span class="tour-opt-name">{{ t.name }}</span>
+          <span class="tour-opt-count">{{ t.games }}</span>
+        </label>
+        <div v-if="!tourList.length" class="tour-empty">No tournaments loaded</div>
+      </div>
+    </div>
+    <div class="header-btn" :class="{active: view==='list'||view==='hero'}" @click="goHome">Heroes</div>
     <div class="header-btn" :class="{active: view==='stats'}" @click="goStats">&#128202; Stats</div>
     <div class="header-btn" :class="{active: view==='admin'}" @click="toggleAdmin">
       &#9881; Data
