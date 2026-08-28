@@ -58,13 +58,15 @@ function aggregate(matches) {
 
   for (const m of matches) {
     wins += m.w;
+    const bi = durBucket(m.dur);
 
     const itemNames = (m.items || []).filter(Boolean);
     const sortedItems = [...itemNames].sort();
     for (const name of itemNames) {
-      const v = itemMap.get(name) || [0, 0, null];
+      const v = itemMap.get(name) || [0, 0, null, null];
       v[0] += m.w; v[1]++;
       if (m.cs) v[2] = csAdd(v[2], m.cs);
+      v[3] = durAdd(v[3], bi, m.w);
       itemMap.set(name, v);
     }
     for (const k of [3, 4, 5, 6]) {
@@ -72,23 +74,26 @@ function aggregate(matches) {
         for (const combo of combinations(sortedItems, k)) {
           const key = combo.join('');
           let v = comboMap[k].get(key);
-          if (!v) { v = { wins: 0, games: 0, items: combo, cs: null }; comboMap[k].set(key, v); }
+          if (!v) { v = { wins: 0, games: 0, items: combo, cs: null, dur: null }; comboMap[k].set(key, v); }
           v.wins += m.w; v.games++;
           if (m.cs) v.cs = csAdd(v.cs, m.cs);
+          v.dur = durAdd(v.dur, bi, m.w);
         }
       }
     }
     if (m.e) {
       let v = emblemMap.get(m.e);
-      if (!v) { v = { wins: 0, games: 0, eid: m.eid, name: m.e, cs: null }; emblemMap.set(m.e, v); }
+      if (!v) { v = { wins: 0, games: 0, eid: m.eid, name: m.e, cs: null, dur: null }; emblemMap.set(m.e, v); }
       v.wins += m.w; v.games++;
       if (m.cs) v.cs = csAdd(v.cs, m.cs);
+      v.dur = durAdd(v.dur, bi, m.w);
     }
     for (const t of m.t || []) {
       let v = talentMap.get(t.id);
-      if (!v) { v = { wins: 0, games: 0, id: t.id, name: t.name, class: t.class, type: t.type, cs: null }; talentMap.set(t.id, v); }
+      if (!v) { v = { wins: 0, games: 0, id: t.id, name: t.name, class: t.class, type: t.type, cs: null, dur: null }; talentMap.set(t.id, v); }
       v.wins += m.w; v.games++;
       if (m.cs) v.cs = csAdd(v.cs, m.cs);
+      v.dur = durAdd(v.dur, bi, m.w);
     }
     if (m.e && m.t && m.t.length) {
       const sortedTal = [...m.t].sort((a, b) => (a.id || '').localeCompare(b.id || ''));
@@ -98,19 +103,21 @@ function aggregate(matches) {
       if (!v) {
         v = {
           wins: 0, games: 0, eid: m.eid, emblem: m.e,
-          talents: sortedTal.map(t => ({ id: t.id, name: t.name })), cs: null,
+          talents: sortedTal.map(t => ({ id: t.id, name: t.name })), cs: null, dur: null,
         };
         embTalMap.set(key, v);
       }
       v.wins += m.w; v.games++;
       if (m.cs) v.cs = csAdd(v.cs, m.cs);
+      v.dur = durAdd(v.dur, bi, m.w);
     }
     const spellName = effectiveSpell(m);
     if (spellName) {
       let v = spellMap.get(spellName);
-      if (!v) { v = { wins: 0, games: 0, name: spellName, cs: null }; spellMap.set(spellName, v); }
+      if (!v) { v = { wins: 0, games: 0, name: spellName, cs: null, dur: null }; spellMap.set(spellName, v); }
       v.wins += m.w; v.games++;
       if (m.cs) v.cs = csAdd(v.cs, m.cs);
+      v.dur = durAdd(v.dur, bi, m.w);
     }
     const pn = m.p || 'Unknown';
     let p = playerMap.get(pn);
@@ -125,8 +132,8 @@ function aggregate(matches) {
   }
 
   const items = [];
-  for (const [name, [w, g, cs]] of itemMap) {
-    items.push({ id: null, name, games: g, wins: w, wr: g ? w / g : 0, wlb: wilsonLower(w, g), cs });
+  for (const [name, [w, g, cs, dur]] of itemMap) {
+    items.push({ id: null, name, games: g, wins: w, wr: g ? w / g : 0, wlb: wilsonLower(w, g), cs, dur });
   }
 
   const item_combos = {};
@@ -135,7 +142,7 @@ function aggregate(matches) {
     for (const v of comboMap[k].values()) {
       arr.push({
         items: v.items, games: v.games, wins: v.wins,
-        wr: v.games ? v.wins / v.games : 0, wlb: wilsonLower(v.wins, v.games), cs: v.cs,
+        wr: v.games ? v.wins / v.games : 0, wlb: wilsonLower(v.wins, v.games), cs: v.cs, dur: v.dur,
       });
     }
     arr.sort((a, b) => b.wlb - a.wlb || b.games - a.games);
@@ -146,7 +153,7 @@ function aggregate(matches) {
   for (const v of emblemMap.values()) {
     emblems.push({
       id: v.eid, name: v.name, games: v.games, wins: v.wins,
-      wr: v.games ? v.wins / v.games : 0, wlb: wilsonLower(v.wins, v.games), cs: v.cs,
+      wr: v.games ? v.wins / v.games : 0, wlb: wilsonLower(v.wins, v.games), cs: v.cs, dur: v.dur,
     });
   }
 
@@ -155,7 +162,7 @@ function aggregate(matches) {
     talents.push({
       id: v.id, name: v.name, class: v.class, type: v.type,
       games: v.games, wins: v.wins,
-      wr: v.games ? v.wins / v.games : 0, wlb: wilsonLower(v.wins, v.games), cs: v.cs,
+      wr: v.games ? v.wins / v.games : 0, wlb: wilsonLower(v.wins, v.games), cs: v.cs, dur: v.dur,
     });
   }
 
@@ -164,7 +171,7 @@ function aggregate(matches) {
     emblem_talent_combos.push({
       emblem_id: v.eid, emblem: v.emblem, talents: v.talents,
       games: v.games, wins: v.wins,
-      wr: v.games ? v.wins / v.games : 0, wlb: wilsonLower(v.wins, v.games), cs: v.cs,
+      wr: v.games ? v.wins / v.games : 0, wlb: wilsonLower(v.wins, v.games), cs: v.cs, dur: v.dur,
     });
   }
 
@@ -211,7 +218,7 @@ function aggregate(matches) {
   for (const v of spellMap.values()) {
     spells.push({
       name: v.name, games: v.games, wins: v.wins,
-      wr: v.games ? v.wins / v.games : 0, wlb: wilsonLower(v.wins, v.games), cs: v.cs,
+      wr: v.games ? v.wins / v.games : 0, wlb: wilsonLower(v.wins, v.games), cs: v.cs, dur: v.dur,
     });
   }
   spells.sort((a, b) => b.games - a.games || b.wlb - a.wlb);
@@ -304,6 +311,53 @@ const METRICS = [
   { key: 'a',         label: 'Avg assists',  fmt: fmt1 },
 ];
 
+// Matchup heatmap color: diverging green(row favored)↔red(col favored) around 50%,
+// faded toward neutral when the sample is small (confidence by game count).
+function _lerp(a, b, t) { return Math.round(a + (b - a) * t); }
+function matchupColor(wr, games) {
+  const neutral = [70, 76, 96];
+  const target = wr >= 0.5 ? [55, 240, 138] : [255, 77, 109];
+  const t = Math.min(1, Math.abs(wr - 0.5) * 2);
+  const r = _lerp(neutral[0], target[0], t);
+  const g = _lerp(neutral[1], target[1], t);
+  const b = _lerp(neutral[2], target[2], t);
+  const conf = Math.min(1, 0.4 + games / 8 * 0.6);   // 0.4 (1 game) → 1.0 (8+ games)
+  return `rgba(${r},${g},${b},${conf})`;
+}
+
+// Lane roles for hero classification / navigation.
+const ROLES = [
+  { key: 'EXP',    color: '#ff7a45' },
+  { key: 'JUNGLE', color: '#37f08a' },
+  { key: 'MID',    color: '#8b5cff' },
+  { key: 'ROAM',   color: '#22e0ff' },
+  { key: 'GOLD',   color: '#ffce4d' },
+];
+function roleColor(key) {
+  const r = ROLES.find(x => x.key === key);
+  return r ? r.color : '#888';
+}
+
+// Game-duration buckets (seconds) for the optional WR-by-length breakdown.
+const DUR_BUCKETS = [
+  { label: '<15m',   lo: 0,    hi: 900 },
+  { label: '15-20m', lo: 900,  hi: 1200 },
+  { label: '20m+',   lo: 1200, hi: Infinity },
+];
+function durBucket(sec) {
+  if (!sec) return -1;
+  for (let i = 0; i < DUR_BUCKETS.length; i++) {
+    if (sec >= DUR_BUCKETS[i].lo && sec < DUR_BUCKETS[i].hi) return i;
+  }
+  return -1;
+}
+// Accumulate a match's win into the right duration bucket of a per-row [w,g] array.
+function durAdd(arr, bi, win) {
+  if (!arr) arr = [[0, 0], [0, 0], [0, 0]];
+  if (bi >= 0) { arr[bi][0] += win; arr[bi][1]++; }
+  return arr;
+}
+
 // Sum a list of raw combat buckets ({n,k,d,a,dmg,dt,g,sec,td} | null) into one, or null.
 function poolCs(buckets) {
   let acc = null;
@@ -372,11 +426,25 @@ createApp({
 
     // Optional combat-metric column shown in the build/emblem/talent tables ('' = off)
     const metric = ref('');
+    // Optional WR-by-game-length breakdown columns (off by default)
+    const showDur = ref(false);
 
     // Global tournament filter (multi-select, applies to every page)
     const tourList = ref([]);      // [{id, name, games}]
     const selTours = ref([]);      // selected tournament ids
     const tourMenuOpen = ref(false);
+
+    // Hero roles: { slug: [ROLE, ...] }. roleFilter drives the Heroes-page navigation.
+    const heroRoles = ref({});
+    const roleFilter = ref('');
+    const roleSearch = ref('');
+
+    // Matchup matrix
+    const matchups = ref({});
+    const matrixBucket = ref(-1);       // -1 = all durations, else 0/1/2
+    const matrixMinGames = ref(1);      // axis floor (heroes with >= N games)
+    const matrixShowVals = ref(false);  // overlay WR numbers in cells
+    const hoverCell = ref(null);        // { row, col, cell, x, y } for the tooltip
 
     // Talent filters
     const talentClassFilter = ref('');
@@ -420,6 +488,38 @@ createApp({
         const resp = await fetch('data/items_name_index.json');
         if (resp.ok) nameIndex.value = await resp.json();
       } catch(e) {}
+    }
+
+    async function loadMatchups() {
+      try {
+        const resp = await fetch('data/matchups.json');
+        if (resp.ok) matchups.value = await resp.json();
+      } catch (e) {}
+    }
+
+    async function loadRoles() {
+      try {
+        let resp = await fetch('/api/roles');
+        if (!resp.ok) resp = await fetch('data/hero_roles.json');
+        if (resp.ok) heroRoles.value = await resp.json();
+      } catch (e) {
+        try { const r = await fetch('data/hero_roles.json'); if (r.ok) heroRoles.value = await r.json(); } catch (_) {}
+      }
+    }
+
+    async function toggleHeroRole(slug, role) {
+      const cur = (heroRoles.value[slug] || []).slice();
+      const i = cur.indexOf(role);
+      if (i >= 0) cur.splice(i, 1);
+      else { if (cur.length >= 2) cur.shift(); cur.push(role); }  // cap 2, drop oldest
+      // optimistic update
+      heroRoles.value = { ...heroRoles.value, [slug]: cur };
+      try {
+        await fetch('/api/roles', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ slug, roles: cur }),
+        });
+      } catch (e) {}
     }
 
     async function loadTourList() {
@@ -468,6 +568,13 @@ createApp({
       view.value = 'stats';
       hero.value = null;
       window.location.hash = '#/stats';
+      nextTick(() => window.scrollTo(0, 0));
+    }
+
+    function goMatrix() {
+      view.value = 'matrix';
+      hero.value = null;
+      window.location.hash = '#/matrix';
       nextTick(() => window.scrollTo(0, 0));
     }
 
@@ -675,13 +782,91 @@ createApp({
       return { games, wins, wr: games ? wins / games : 0, cs: finalizeCs(poolCs(buckets)) };
     }
     // Hero list with per-tournament-filtered aggregates (drives list + leaderboard).
-    const heroesView = computed(() => heroes.value.map(h => ({ ...h, ...heroAgg(h) })));
+    const heroesView = computed(() => heroes.value.map(h => ({
+      ...h, ...heroAgg(h), roles: heroRoles.value[h.slug] || [],
+    })));
+
+    // Count of heroes (with data) per role, for the filter chips.
+    const roleCounts = computed(() => {
+      const c = {};
+      for (const h of heroesView.value) {
+        if (h.games <= 0) continue;
+        for (const r of h.roles) c[r] = (c[r] || 0) + 1;
+      }
+      return c;
+    });
+
+    // --- Matchup matrix ---
+    const slugName = computed(() => {
+      const m = {};
+      for (const h of heroes.value) m[h.slug] = h.name;
+      return m;
+    });
+    // Axis uses total games (all tournaments), matching the global matchup data.
+    const matrixHeroes = computed(() =>
+      heroes.value
+        .filter(h => h.games >= matrixMinGames.value)
+        .slice()
+        .sort((a, b) => b.games - a.games || a.name.localeCompare(b.name))
+    );
+    function matrixCell(row, col) {
+      if (row === col) return null;
+      const data = matchups.value[row] && matchups.value[row][col];
+      if (!data) return null;
+      let g, w;
+      if (matrixBucket.value < 0) { g = data.g; w = data.w; }
+      else { const b = data.b[matrixBucket.value]; w = b[0]; g = b[1]; }
+      if (!g) return null;
+      return { g, w, l: g - w, wr: w / g };
+    }
+    // Precompute the whole grid once per filter change (avoids per-cell recomputation).
+    const matrixGrid = computed(() => {
+      const arr = matrixHeroes.value;
+      const bucket = matrixBucket.value;
+      const mm = matchups.value;
+      return arr.map(r => ({
+        slug: r.slug, name: r.name, portrait: r.portrait,
+        cells: arr.map(c => {
+          if (r.slug === c.slug) return { diag: true };
+          const data = mm[r.slug] && mm[r.slug][c.slug];
+          if (!data) return { na: true, slug: c.slug };
+          let g, w;
+          if (bucket < 0) { g = data.g; w = data.w; }
+          else { const b = data.b[bucket]; w = b[0]; g = b[1]; }
+          if (!g) return { na: true, slug: c.slug };
+          const wr = w / g;
+          return { slug: c.slug, g, w, l: g - w, wr, bg: matchupColor(wr, g), v: Math.round(wr * 100) };
+        }),
+      }));
+    });
+    function onMatrixMove(e) {
+      const td = e.target.closest ? e.target.closest('td[data-r]') : null;
+      if (!td) { hoverCell.value = null; return; }
+      const row = td.dataset.r, col = td.dataset.c;
+      const cell = matrixCell(row, col);
+      if (!cell) { hoverCell.value = null; return; }
+      hoverCell.value = {
+        row: slugName.value[row] || row, col: slugName.value[col] || col,
+        cell, x: e.clientX, y: e.clientY,
+      };
+    }
+    function onMatrixLeave() { hoverCell.value = null; }
+
+    // Full roster (searchable) for the admin role editor.
+    const roleEditorHeroes = computed(() => {
+      const q = roleSearch.value.toLowerCase();
+      return heroesView.value
+        .filter(h => !q || h.name.toLowerCase().includes(q))
+        .slice()
+        .sort((a, b) => b.games - a.games || a.name.localeCompare(b.name));
+    });
 
     // --- computed: hero list ---
     const filteredHeroes = computed(() => {
       let list = heroesView.value.filter(h => {
         if (minGames.value > 0 && h.games < minGames.value && h.games > 0) return false;
         if (search.value && !h.name.toLowerCase().includes(search.value.toLowerCase())) return false;
+        if (roleFilter.value && !h.roles.includes(roleFilter.value)) return false;
         return true;
       });
       const s = sortBy.value;
@@ -732,25 +917,37 @@ createApp({
     });
 
     const enemyCounts = computed(() => {
-      const counts = new Map();
+      const counts = new Map();   // name -> [games, wins]
       const ms = hero.value?.matches || [];
       const set = selTourSet.value;
       const tourActive = !allToursSelected.value;
       for (const m of ms) {
         if (tourActive && !set.has(m.tid)) continue;
         for (const e of m.enemies || []) {
-          counts.set(e, (counts.get(e) || 0) + 1);
+          const v = counts.get(e) || [0, 0];
+          v[0]++; v[1] += m.w;
+          counts.set(e, v);
         }
       }
       return [...counts.entries()]
-        .sort((a, b) => b[1] - a[1])
-        .map(([name, games]) => ({ name, games }));
+        .sort((a, b) => b[1][0] - a[1][0])
+        .map(([name, [games, wins]]) => ({ name, games, wins, wr: games ? wins / games : 0 }));
     });
 
     const aggregated = computed(() => aggregate(filteredMatches.value));
 
     // Combat stats for the current hero, over the same date/enemy-filtered matches.
     const heroCombat = computed(() => combatAggregate(filteredMatches.value));
+
+    // Hero's own WR split by game-duration bucket (shaped like a row's .dur for reuse).
+    const heroDur = computed(() => {
+      const arr = [[0, 0], [0, 0], [0, 0]];
+      for (const m of filteredMatches.value) {
+        const bi = durBucket(m.dur);
+        if (bi >= 0) { arr[bi][0] += m.w; arr[bi][1]++; }
+      }
+      return { dur: arr };
+    });
 
     // --- computed: hero detail tables ---
     function makeSorter(data, state) {
@@ -874,6 +1071,20 @@ createApp({
       return v == null ? '—' : m.fmt(v);
     }
 
+    // WR (0..1) and game count for a row within duration bucket i, or null if empty.
+    function durG(row, i) {
+      const b = row && row.dur && row.dur[i];
+      return b ? b[1] : 0;
+    }
+    function durWr(row, i) {
+      const b = row && row.dur && row.dur[i];
+      return b && b[1] ? b[0] / b[1] : null;
+    }
+    function durWrFmt(row, i) {
+      const wr = durWr(row, i);
+      return wr == null ? '—' : (wr * 100).toFixed(0) + '%';
+    }
+
     // --- routing ---
     async function handleRoute() {
       const hash = window.location.hash;
@@ -884,6 +1095,10 @@ createApp({
       }
       if (hash === '#/stats') {
         view.value = 'stats';
+        return;
+      }
+      if (hash === '#/matrix') {
+        view.value = 'matrix';
         return;
       }
       const m = hash.match(/^#\/hero\/(.+)$/);
@@ -903,6 +1118,8 @@ createApp({
       await loadHeroes();
       await loadNameIndex();
       await loadTourList();
+      await loadRoles();
+      loadMatchups();
       handleRoute();
     });
 
@@ -913,14 +1130,19 @@ createApp({
       comboSize, talentClassFilter, talentTypeFilter,
       dateFrom, dateTo, dateMin, dateMax, setDatePreset,
       enemyFilter, enemyCounts,
-      filteredMatches, aggregated, heroCombat,
+      filteredMatches, aggregated, heroCombat, heroDur,
       filteredHeroes, sortedItems, sortedCombos, sortedEmblems,
       sortedTalents, sortedEmbTal, sortedPlayers, sortedSpells, talentClasses,
       statRows, statSort, statMinGames, sortStats, statCls,
       metric, metrics: METRICS, metricLabel, mvFmt,
+      showDur, durBuckets: DUR_BUCKETS, durG, durWr, durWrFmt,
       tourList, selTours, selTourSet, tourMenuOpen, allToursSelected, tourBtnLabel,
       toggleTour, selectAllTours, selectNoneTours,
-      openHero, goHome, goStats, toggleAdmin,
+      roles: ROLES, roleColor, heroRoles, roleFilter, roleSearch, roleCounts,
+      roleEditorHeroes, toggleHeroRole,
+      openHero, goHome, goStats, goMatrix, toggleAdmin,
+      matrixHeroes, matrixGrid, matrixBucket, matrixMinGames,
+      matrixShowVals, hoverCell, onMatrixMove, onMatrixLeave,
       sortItems, sortCombos, sortEmblems, sortTalents, sortEmbTal, sortPlayers, sortSpells,
       itemIcon, itemIconByName, runeIcon, emblemIcon, spellIcon, heroIcon, heroSlugFromName,
       wrClass, deltaFmt, deltaClass, fmtK, fmtInt, fmt1, fmt2, fmtPct,

@@ -4,17 +4,34 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>MLBB Pro Stats</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<svg aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden">
+  <defs>
+    <linearGradient id="grad-logo" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff2e63"/><stop offset="0.55" stop-color="#b14dff"/><stop offset="1" stop-color="#22e0ff"/>
+    </linearGradient>
+  </defs>
+  <symbol id="i-logo" viewBox="0 0 24 24"><path d="M12 2l8.66 5v10L12 22l-8.66-5V7L12 2Z"/><path d="M13 7l-4 6h3l-1 4 4-6h-3l1-4Z"/></symbol>
+  <symbol id="i-heroes" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+  <symbol id="i-stats" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M20 20v-4"/></symbol>
+  <symbol id="i-trophy" viewBox="0 0 24 24"><path d="M7 4h10v4a5 5 0 0 1-10 0V4Z"/><path d="M17 5h3v1a3 3 0 0 1-3 3M7 5H4v1a3 3 0 0 0 3 3"/><path d="M12 13v4M8 21h8M10 17h4"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></symbol>
+</svg>
 <div id="app">
   <!-- Header -->
   <div class="header">
-    <h1 @click="goHome">MLBB Pro Stats</h1>
+    <h1 @click="goHome"><svg class="ico"><use href="#i-logo"/></svg>MLBB Pro Stats</h1>
     <input class="search" type="text" placeholder="Search hero..." v-model="search" v-show="view==='list'">
     <div class="tour-filter" style="margin-left:auto">
       <div class="header-btn" :class="{active: tourMenuOpen || !allToursSelected}" @click="tourMenuOpen=!tourMenuOpen">
-        &#127942; {{ tourBtnLabel }} &#9662;
+        <svg class="ico"><use href="#i-trophy"/></svg> {{ tourBtnLabel }} <span style="opacity:.6">&#9662;</span>
       </div>
       <div v-if="tourMenuOpen" class="tour-backdrop" @click="tourMenuOpen=false"></div>
       <div v-if="tourMenuOpen" class="tour-menu">
@@ -30,10 +47,11 @@
         <div v-if="!tourList.length" class="tour-empty">No tournaments loaded</div>
       </div>
     </div>
-    <div class="header-btn" :class="{active: view==='list'||view==='hero'}" @click="goHome">Heroes</div>
-    <div class="header-btn" :class="{active: view==='stats'}" @click="goStats">&#128202; Stats</div>
+    <div class="header-btn" :class="{active: view==='list'||view==='hero'}" @click="goHome"><svg class="ico"><use href="#i-heroes"/></svg> Heroes</div>
+    <div class="header-btn" :class="{active: view==='stats'}" @click="goStats"><svg class="ico"><use href="#i-stats"/></svg> Stats</div>
+    <div class="header-btn" :class="{active: view==='matrix'}" @click="goMatrix"><svg class="ico"><use href="#i-grid"/></svg> Matrix</div>
     <div class="header-btn" :class="{active: view==='admin'}" @click="toggleAdmin">
-      &#9881; Data
+      <svg class="ico"><use href="#i-gear"/></svg> Data
     </div>
   </div>
 
@@ -51,7 +69,18 @@
         <input type="number" v-model.number="minGames" min="0" max="999" style="width:70px">
       </div>
 
-      <div class="hero-grid">
+      <div class="role-tabs">
+        <button class="role-tab" :class="{active: roleFilter===''}" @click="roleFilter=''">All</button>
+        <button v-for="r in roles" :key="r.key" class="role-tab"
+                :class="{active: roleFilter===r.key}"
+                :style="roleFilter===r.key ? {borderColor:r.color, background:r.color+'22', boxShadow:'0 0 14px '+r.color+'55'} : {}"
+                @click="roleFilter = roleFilter===r.key ? '' : r.key">
+          <span class="role-dot" :style="{background:r.color}"></span>{{ r.key }}
+          <span class="role-count">{{ roleCounts[r.key]||0 }}</span>
+        </button>
+      </div>
+
+      <div class="hero-grid" :class="{'role-tinted': roleFilter}" :style="roleFilter ? {'--tile-c': roleColor(roleFilter)} : null">
         <div class="hero-tile" v-for="h in filteredHeroes" :key="h.slug"
              @click="openHero(h)" :class="{'no-data': h.games===0}">
           <img :src="h.portrait" :alt="h.name" loading="lazy"
@@ -62,6 +91,10 @@
             <span :class="wrClass(h.wr)">{{ (h.wr*100).toFixed(1) }}%</span>
           </div>
           <div class="stats" v-else>No data</div>
+          <div class="tile-roles" v-if="h.roles.length">
+            <span v-for="r in h.roles" :key="r" class="role-badge"
+                  :style="{color:roleColor(r), borderColor:roleColor(r)+'66', background:roleColor(r)+'1f'}">{{ r }}</span>
+          </div>
         </div>
       </div>
     </template>
@@ -69,7 +102,7 @@
     <!-- STATS LEADERBOARD VIEW -->
     <template v-if="view==='stats'">
       <div class="filters">
-        <div class="section-title" style="margin:0">&#128202; Hero Combat Stats</div>
+        <div class="section-title" style="margin:0"><svg class="ico"><use href="#i-stats"/></svg> Hero Combat Stats</div>
         <span style="flex:1"></span>
         <label>Min games:</label>
         <input type="number" v-model.number="statMinGames" min="0" max="999" style="width:70px">
@@ -125,9 +158,69 @@
       </div>
     </template>
 
+    <!-- MATCHUP MATRIX VIEW -->
+    <template v-if="view==='matrix'">
+      <div class="filters">
+        <div class="section-title" style="margin:0"><svg class="ico"><use href="#i-grid"/></svg> Matchup Matrix</div>
+        <span style="flex:1"></span>
+        <label>Duration:</label>
+        <div class="mx-seg">
+          <button :class="{active: matrixBucket===-1}" @click="matrixBucket=-1">All</button>
+          <button v-for="(b,i) in durBuckets" :key="i" :class="{active: matrixBucket===i}" @click="matrixBucket=i">{{ b.label }}</button>
+        </div>
+        <label>Min games:</label>
+        <input type="number" v-model.number="matrixMinGames" min="1" max="999" style="width:64px">
+        <label class="dur-toggle"><input type="checkbox" v-model="matrixShowVals"> Show %</label>
+      </div>
+
+      <div class="mx-legend">
+        <span>Cell = <b>row hero</b>'s win rate vs <b>column hero</b> (games where the column hero was on the enemy team).</span>
+        <span class="mx-scale"><i>Col favored</i><span class="mx-bar"></span><i>Row favored</i></span>
+        <span class="mx-note">Faded = few games &middot; empty = never met (N/A)</span>
+      </div>
+
+      <div class="mx-wrap" @mousemove="onMatrixMove" @mouseleave="onMatrixLeave">
+        <table class="mx-table">
+          <thead>
+            <tr>
+              <th class="mx-corner">vs &rarr;</th>
+              <th v-for="c in matrixHeroes" :key="c.slug" class="mx-colhead" :title="c.name">
+                <img :src="c.portrait" :alt="c.name" loading="lazy"
+                     @error="if(!$event.target.dataset.fb){$event.target.dataset.fb=1;$event.target.src='img/heroes/unknown.png'}">
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="row in matrixGrid" :key="row.slug">
+              <th class="mx-rowhead" :title="row.name">
+                <img :src="row.portrait" :alt="row.name" loading="lazy"
+                     @error="if(!$event.target.dataset.fb){$event.target.dataset.fb=1;$event.target.src='img/heroes/unknown.png'}">
+                <span class="mx-rowname">{{ row.name }}</span>
+              </th>
+              <td v-for="(cell, ci) in row.cells" :key="ci"
+                  :data-r="row.slug" :data-c="cell.slug"
+                  :class="{'mx-diag': cell.diag, 'mx-na': cell.na}"
+                  :style="cell.bg ? {background: cell.bg} : null">
+                <span v-if="matrixShowVals && cell.v!=null">{{ cell.v }}</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div v-if="!matrixHeroes.length" style="color:var(--text2);padding:24px;text-align:center">
+        No heroes with &ge; {{ matrixMinGames }} games. Lower the threshold.
+      </div>
+
+      <div class="mx-tooltip" v-if="hoverCell" :style="{left: hoverCell.x+'px', top: hoverCell.y+'px'}">
+        <div class="mx-tt-title">{{ hoverCell.row }} <span style="color:var(--text2)">vs</span> {{ hoverCell.col }}</div>
+        <div class="mx-tt-wr" :class="hoverCell.cell.wr>=0.5?'wr-high':'wr-low'">{{ (hoverCell.cell.wr*100).toFixed(1) }}%</div>
+        <div class="mx-tt-sub">{{ hoverCell.cell.w }}W &ndash; {{ hoverCell.cell.l }}L &middot; {{ hoverCell.cell.g }} games</div>
+      </div>
+    </template>
+
     <!-- HERO DETAIL VIEW -->
     <template v-if="view==='hero' && hero">
-      <div class="back-btn" @click="goHome">← Back to heroes</div>
+      <div class="back-btn" @click="goHome"><svg class="ico"><use href="#i-back"/></svg> Back to heroes</div>
 
       <div class="hero-header">
         <img :src="hero.portrait" :alt="hero.name"
@@ -140,6 +233,14 @@
             <span class="wr" :class="wrClass(aggregated.wr)">{{ (aggregated.wr*100).toFixed(1) }}%</span> WR
             <span v-if="dateFrom || dateTo" style="color:var(--text2);font-size:12px;margin-left:6px">
               (filtered from {{ hero.total_games }}g)
+            </span>
+          </div>
+          <div class="baseline-dur" v-if="aggregated.total_games">
+            <span class="bd-title">WR by length:</span>
+            <span v-for="(b,i) in durBuckets" :key="i" class="dur-chip">
+              <span class="dur-chip-label">{{ b.label }}</span>
+              <span class="dur-chip-wr" :class="durWr(heroDur,i)==null?'':wrClass(durWr(heroDur,i))">{{ durWrFmt(heroDur,i) }}</span>
+              <span class="dur-chip-g">{{ durG(heroDur,i) }}g</span>
             </span>
           </div>
         </div>
@@ -202,8 +303,12 @@
           <option value="">&mdash; none &mdash;</option>
           <option v-for="m in metrics" :key="m.key" :value="m.key">{{ m.label }}</option>
         </select>
+        <label class="dur-toggle"><input type="checkbox" v-model="showDur"> WR by game length</label>
         <span class="metric-hint" v-if="metric">
-          per row: counts = avg/game, ratios pooled &middot; click the "{{ metricLabel }}" header to sort
+          combat: counts = avg/game, ratios pooled
+        </span>
+        <span class="metric-hint" v-if="showDur">
+          WR split by match duration (games shown under each %)
         </span>
       </div>
 
@@ -270,6 +375,7 @@
               <th></th>
               <th @click="sortItems('name')">Item</th>
               <th @click="sortItems('wr')">WR</th>
+              <template v-if="showDur"><th v-for="(b,i) in durBuckets" :key="'dh'+i" class="dur-th" :title="'WR in '+b.label+' games'">{{ b.label }}</th></template>
               <th @click="sortItems('games')">Games</th>
               <th v-if="metric" @click="sortItems('mv')" class="metric-th">{{ metricLabel }}</th>
               <th>vs base</th>
@@ -281,6 +387,7 @@
                        @error="$event.target.style.display='none'"></td>
               <td>{{ it.name }}</td>
               <td class="wr" :class="wrClass(it.wr)">{{ (it.wr*100).toFixed(1) }}%</td>
+              <template v-if="showDur"><td v-for="(b,i) in durBuckets" :key="'dc'+i" class="dur-cell"><span :class="durWr(it,i)==null?'':wrClass(durWr(it,i))">{{ durWrFmt(it,i) }}</span><small class="dur-g">{{ durG(it,i) }}</small></td></template>
               <td>{{ it.games }}</td>
               <td v-if="metric" class="metric-cell">{{ mvFmt(it) }}</td>
               <td :class="deltaClass(it.wr - aggregated.wr)">{{ deltaFmt(it.wr - aggregated.wr) }}</td>
@@ -305,6 +412,7 @@
             <tr>
               <th>Build</th>
               <th @click="sortCombos('wr')">WR</th>
+              <template v-if="showDur"><th v-for="(b,i) in durBuckets" :key="'dh'+i" class="dur-th" :title="'WR in '+b.label+' games'">{{ b.label }}</th></template>
               <th @click="sortCombos('games')">Games</th>
               <th v-if="metric" @click="sortCombos('mv')" class="metric-th">{{ metricLabel }}</th>
             </tr>
@@ -321,6 +429,7 @@
                 </div>
               </td>
               <td class="wr" :class="wrClass(c.wr)">{{ (c.wr*100).toFixed(1) }}%</td>
+              <template v-if="showDur"><td v-for="(b,i) in durBuckets" :key="'dc'+i" class="dur-cell"><span :class="durWr(c,i)==null?'':wrClass(durWr(c,i))">{{ durWrFmt(c,i) }}</span><small class="dur-g">{{ durG(c,i) }}</small></td></template>
               <td>{{ c.games }}</td>
               <td v-if="metric" class="metric-cell">{{ mvFmt(c) }}</td>
             </tr>
@@ -339,6 +448,7 @@
               <th></th>
               <th>Emblem</th>
               <th @click="sortEmblems('wr')">WR</th>
+              <template v-if="showDur"><th v-for="(b,i) in durBuckets" :key="'dh'+i" class="dur-th" :title="'WR in '+b.label+' games'">{{ b.label }}</th></template>
               <th @click="sortEmblems('games')">Games</th>
               <th v-if="metric" @click="sortEmblems('mv')" class="metric-th">{{ metricLabel }}</th>
               <th>Pick%</th>
@@ -349,6 +459,7 @@
               <td><img class="icon" :src="emblemIcon(e.id)" v-if="e.id"></td>
               <td>{{ e.name }}</td>
               <td class="wr" :class="wrClass(e.wr)">{{ (e.wr*100).toFixed(1) }}%</td>
+              <template v-if="showDur"><td v-for="(b,i) in durBuckets" :key="'dc'+i" class="dur-cell"><span :class="durWr(e,i)==null?'':wrClass(durWr(e,i))">{{ durWrFmt(e,i) }}</span><small class="dur-g">{{ durG(e,i) }}</small></td></template>
               <td>{{ e.games }}</td>
               <td v-if="metric" class="metric-cell">{{ mvFmt(e) }}</td>
               <td>{{ aggregated.total_games ? (e.games/aggregated.total_games*100).toFixed(0) : 0 }}%</td>
@@ -380,6 +491,7 @@
               <th>Class</th>
               <th>Type</th>
               <th @click="sortTalents('wr')">WR</th>
+              <template v-if="showDur"><th v-for="(b,i) in durBuckets" :key="'dh'+i" class="dur-th" :title="'WR in '+b.label+' games'">{{ b.label }}</th></template>
               <th @click="sortTalents('games')">Games</th>
               <th v-if="metric" @click="sortTalents('mv')" class="metric-th">{{ metricLabel }}</th>
             </tr>
@@ -391,6 +503,7 @@
               <td>{{ t.class }}</td>
               <td>{{ t.type }}</td>
               <td class="wr" :class="wrClass(t.wr)">{{ (t.wr*100).toFixed(1) }}%</td>
+              <template v-if="showDur"><td v-for="(b,i) in durBuckets" :key="'dc'+i" class="dur-cell"><span :class="durWr(t,i)==null?'':wrClass(durWr(t,i))">{{ durWrFmt(t,i) }}</span><small class="dur-g">{{ durG(t,i) }}</small></td></template>
               <td>{{ t.games }}</td>
               <td v-if="metric" class="metric-cell">{{ mvFmt(t) }}</td>
             </tr>
@@ -406,6 +519,7 @@
               <th>Emblem</th>
               <th>Talents</th>
               <th @click="sortEmbTal('wr')">WR</th>
+              <template v-if="showDur"><th v-for="(b,i) in durBuckets" :key="'dh'+i" class="dur-th" :title="'WR in '+b.label+' games'">{{ b.label }}</th></template>
               <th @click="sortEmbTal('games')">Games</th>
               <th v-if="metric" @click="sortEmbTal('mv')" class="metric-th">{{ metricLabel }}</th>
             </tr>
@@ -427,6 +541,7 @@
                 </div>
               </td>
               <td class="wr" :class="wrClass(et.wr)">{{ (et.wr*100).toFixed(1) }}%</td>
+              <template v-if="showDur"><td v-for="(b,i) in durBuckets" :key="'dc'+i" class="dur-cell"><span :class="durWr(et,i)==null?'':wrClass(durWr(et,i))">{{ durWrFmt(et,i) }}</span><small class="dur-g">{{ durG(et,i) }}</small></td></template>
               <td>{{ et.games }}</td>
               <td v-if="metric" class="metric-cell">{{ mvFmt(et) }}</td>
             </tr>
@@ -445,6 +560,7 @@
               <th></th>
               <th>Battle Spell</th>
               <th @click="sortSpells('wr')">WR</th>
+              <template v-if="showDur"><th v-for="(b,i) in durBuckets" :key="'dh'+i" class="dur-th" :title="'WR in '+b.label+' games'">{{ b.label }}</th></template>
               <th @click="sortSpells('games')">Games</th>
               <th v-if="metric" @click="sortSpells('mv')" class="metric-th">{{ metricLabel }}</th>
               <th>Pick%</th>
@@ -456,6 +572,7 @@
                        @error="$event.target.style.display='none'"></td>
               <td>{{ s.name }}</td>
               <td class="wr" :class="wrClass(s.wr)">{{ (s.wr*100).toFixed(1) }}%</td>
+              <template v-if="showDur"><td v-for="(b,i) in durBuckets" :key="'dc'+i" class="dur-cell"><span :class="durWr(s,i)==null?'':wrClass(durWr(s,i))">{{ durWrFmt(s,i) }}</span><small class="dur-g">{{ durG(s,i) }}</small></td></template>
               <td>{{ s.games }}</td>
               <td v-if="metric" class="metric-cell">{{ mvFmt(s) }}</td>
               <td>{{ aggregated.total_games ? (s.games/aggregated.total_games*100).toFixed(0) : 0 }}%</td>
@@ -573,7 +690,7 @@
               <img :src="heroIcon(e.name)" :alt="e.name"
                    @error="if(!$event.target.dataset.fb){$event.target.dataset.fb=1;$event.target.src='img/heroes/unknown.png'}" style="width:56px;height:56px">
               <div class="name" style="font-size:12px">{{ e.name }}</div>
-              <div class="stats">{{ e.games }}g</div>
+              <div class="stats">{{ e.games }}g &bull; <span class="wr" :class="wrClass(e.wr)">{{ (e.wr*100).toFixed(0) }}%</span></div>
             </div>
           </div>
         </div>
@@ -621,8 +738,31 @@
 
     <!-- ADMIN VIEW -->
     <template v-if="view==='admin'">
-      <div class="back-btn" @click="goHome">← Back to heroes</div>
+      <div class="back-btn" @click="goHome"><svg class="ico"><use href="#i-back"/></svg> Back to heroes</div>
       <h2 style="color:var(--accent);margin-bottom:16px">Data Management</h2>
+
+      <!-- Hero Roles -->
+      <div class="admin-section">
+        <div class="section-title"><svg class="ico"><use href="#i-heroes"/></svg> Hero Roles</div>
+        <p style="color:var(--text2);font-size:13px;margin-bottom:12px">
+          Assign 1&ndash;2 lane roles per hero (tap a role to toggle). Saved instantly &mdash; powers the role filter on the Heroes page.
+        </p>
+        <input class="admin-input" placeholder="Filter heroes..." v-model="roleSearch" style="max-width:260px;margin-bottom:12px">
+        <div class="role-editor">
+          <div class="role-erow" v-for="h in roleEditorHeroes" :key="h.slug">
+            <img :src="h.portrait" :alt="h.name" loading="lazy"
+                 @error="if(!$event.target.dataset.fb){$event.target.dataset.fb=1;$event.target.src='img/heroes/unknown.png'}">
+            <span class="role-erow-name">{{ h.name }}</span>
+            <span class="role-erow-g" v-if="h.games">{{ h.games }}g</span>
+            <div class="role-erow-btns">
+              <button v-for="r in roles" :key="r.key" class="role-pick"
+                      :class="{active:(heroRoles[h.slug]||[]).includes(r.key)}"
+                      :style="(heroRoles[h.slug]||[]).includes(r.key) ? {background:r.color, borderColor:r.color, color:'#0a0a14'} : {borderColor:r.color+'55', color:r.color}"
+                      @click="toggleHeroRole(h.slug, r.key)">{{ r.key }}</button>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <!-- Scoregg API Config -->
       <div class="admin-section">
@@ -746,7 +886,9 @@
     </template>
 
     <!-- Loading -->
-    <div v-if="loading" style="text-align:center;padding:40px;color:var(--text2)">Loading...</div>
+    <div v-if="loading" style="text-align:center;padding:40px;color:var(--text2)">
+      <span class="loading-spin"></span>Loading...
+    </div>
   </div>
 </div>
 
